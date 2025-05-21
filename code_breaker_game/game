@@ -2,27 +2,19 @@
 #include <Keypad.h>
 
 // TFT Display pin definitions
-#define TFT_SCLK  18      // SPI Clock
-#define TFT_MOSI  23      // SPI MOSI
-#define TFT_MISO  19      // SPI MISO (required for bus object)
-#define TFT_CS    15      // TFT Chip Select
-#define TFT_DC    21      // TFT Data/Command
-#define TFT_RST   2       // TFT Reset
+#define TFT_SCLK  18
+#define TFT_MOSI  23
+#define TFT_MISO  19
+#define TFT_CS    15
+#define TFT_DC    21
+#define TFT_RST   2
 
-// Touch (XPT2046) pin definitions (not used yet, but reserved)
-#define TOUCH_CS   4
-#define TOUCH_IRQ  5
-#define TOUCH_CLK  18
-#define TOUCH_DIN  23
-#define TOUCH_DO   19
-
-// Screen dimensions for ILI9341
 #define SCREEN_WIDTH  240
 #define SCREEN_HEIGHT 320
 
 // Keypad definitions
-const byte ROWS = 4; // Four rows
-const byte COLS = 3; // Three columns
+const byte ROWS = 4;
+const byte COLS = 3;
 
 char keys[ROWS][COLS] = {
   {'1','2','3'},
@@ -31,8 +23,8 @@ char keys[ROWS][COLS] = {
   {'*','0','#'}
 };
 
-byte rowPins[ROWS] = {13, 12, 27, 26}; // Your chosen row pins
-byte colPins[COLS] = {25, 33, 32};     // Your chosen column pins
+byte rowPins[ROWS] = {13, 12, 27, 26};
+byte colPins[COLS] = {25, 33, 32};
 
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
@@ -43,6 +35,9 @@ Arduino_ILI9341 display(&bus, TFT_RST);
 // Buffer for storing 3 keys
 char inputBuffer[4]; // 3 chars + null terminator
 byte inputIndex = 0;
+
+// Store the random number as a string for comparison
+char randomNumberStr[4];
 
 void setup() {
   Serial.begin(9600);
@@ -64,10 +59,11 @@ void setup() {
 
   // Generate a random 3-digit number (000–999, with leading zeros)
   int randomNumber = random(0, 1000);
+  snprintf(randomNumberStr, sizeof(randomNumberStr), "%03d", randomNumber);
 
   // Calculate text size and position for centering
-  int charWidth = 6 * 2;   // 6 pixels per char * text size 2
-  int charHeight = 8 * 2;  // 8 pixels height * text size 2
+  int charWidth = 6 * 2;
+  int charHeight = 8 * 2;
   int numChars = 3;
   int textWidth = charWidth * numChars;
   int textHeight = charHeight;
@@ -77,41 +73,32 @@ void setup() {
 
   // Set cursor to center and print the number
   display.setCursor(x, y);
-  char buf[4];
-  snprintf(buf, sizeof(buf), "%03d", randomNumber);
-  display.print(buf);
-
-  // --- Draw the "hi" button below the number ---
-  // Button size and position
-  int buttonWidth = 60;
-  int buttonHeight = 30;
-  int buttonX = (SCREEN_WIDTH - buttonWidth) / 2;
-  int buttonY = y + textHeight + 20; // 20 pixels below the number
-
-  // Draw button outline (green)
-  display.drawRect(buttonX, buttonY, buttonWidth, buttonHeight, GREEN);
-
-  // Draw button label "hi" centered inside
-  display.setTextColor(BLACK);
-  display.setTextSize(2);
-  int hiTextWidth = 2 * 6 * 2; // "hi" = 2 chars, 6px wide, size 2
-  int hiTextHeight = 8 * 2;
-  int hiTextX = buttonX + (buttonWidth - hiTextWidth) / 2;
-  int hiTextY = buttonY + (buttonHeight - hiTextHeight) / 2;
-  display.setCursor(hiTextX, hiTextY);
-  display.print("hi");
+  display.print(randomNumberStr);
 }
 
 void loop() {
   char key = keypad.getKey();
   if (key) {
-    // Accept any key ('0'-'9', '*', or '#')
     if (inputIndex < 3) {
       inputBuffer[inputIndex++] = key;
     }
     if (inputIndex == 3) {
       inputBuffer[3] = '\0'; // Null-terminate
-      Serial.println(inputBuffer);
+
+      // Compare inputBuffer to randomNumberStr
+      int matchCount = 0;
+      for (int i = 0; i < 3; i++) {
+        if (inputBuffer[i] == randomNumberStr[i]) {
+          matchCount++;
+        }
+      }
+      Serial.print("Input: ");
+      Serial.print(inputBuffer);
+      Serial.print(" | Random: ");
+      Serial.print(randomNumberStr);
+      Serial.print(" | Matches: ");
+      Serial.println(matchCount);
+
       inputIndex = 0; // Reset for next 3 keys
     }
   }
