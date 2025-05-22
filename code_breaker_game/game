@@ -39,6 +39,27 @@ byte inputIndex = 0;
 // Store the random number as a string for comparison
 char randomNumberStr[4];
 
+// Function to generate and display a new random number
+void generateNewRandomNumber() {
+  int randomNumber = random(0, 1000);
+  snprintf(randomNumberStr, sizeof(randomNumberStr), "%03d", randomNumber);
+
+  // Clear just the area where the number is displayed
+  int charWidth = 6 * 2;
+  int charHeight = 8 * 2;
+  int numChars = 3;
+  int textWidth = charWidth * numChars;
+  int textHeight = charHeight;
+  int x = (SCREEN_WIDTH - textWidth) / 2;
+  int y = (SCREEN_HEIGHT - textHeight) / 2;
+
+  display.fillRect(x, y, textWidth, textHeight, WHITE); // Clear previous number
+  display.setCursor(x, y);
+  display.setTextColor(BLACK);
+  display.setTextSize(2);
+  display.print(randomNumberStr);
+}
+
 void setup() {
   Serial.begin(9600);
 
@@ -57,23 +78,8 @@ void setup() {
   // Clear the screen
   display.fillScreen(WHITE);
 
-  // Generate a random 3-digit number (000–999, with leading zeros)
-  int randomNumber = random(0, 1000);
-  snprintf(randomNumberStr, sizeof(randomNumberStr), "%03d", randomNumber);
-
-  // Calculate text size and position for centering
-  int charWidth = 6 * 2;
-  int charHeight = 8 * 2;
-  int numChars = 3;
-  int textWidth = charWidth * numChars;
-  int textHeight = charHeight;
-
-  int x = (SCREEN_WIDTH - textWidth) / 2;
-  int y = (SCREEN_HEIGHT - textHeight) / 2;
-
-  // Set cursor to center and print the number
-  display.setCursor(x, y);
-  display.print(randomNumberStr);
+  // Generate and display the initial random number
+  generateNewRandomNumber();
 }
 
 void loop() {
@@ -89,7 +95,7 @@ void loop() {
       if (strcmp(inputBuffer, randomNumberStr) == 0) {
         Serial.println("You won!");
         Serial.println("Creating a new challenge.");
-        // Do not create a new number yet
+        generateNewRandomNumber(); // Generate and display a new number
       } else {
         // Compare inputBuffer to randomNumberStr for matches
         int matchCount = 0;
