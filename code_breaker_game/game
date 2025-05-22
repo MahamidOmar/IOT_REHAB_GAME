@@ -44,20 +44,26 @@ void generateNewRandomNumber() {
   int randomNumber = random(0, 1000);
   snprintf(randomNumberStr, sizeof(randomNumberStr), "%03d", randomNumber);
 
-  // Clear just the area where the number is displayed
+  // Print the new random number to the Serial Monitor
+  Serial.print("New random number: ");
+  Serial.println(randomNumberStr);
+
+  // Clear just the area where the stars are displayed
   int charWidth = 6 * 2;
   int charHeight = 8 * 2;
   int numChars = 3;
   int textWidth = charWidth * numChars;
   int textHeight = charHeight;
-  int x = (SCREEN_WIDTH - textWidth) / 2;
-  int y = (SCREEN_HEIGHT - textHeight) / 2;
 
-  display.fillRect(x, y, textWidth, textHeight, WHITE); // Clear previous number
+  // Move the stars higher up (e.g., 40 pixels from the top)
+  int x = (SCREEN_WIDTH - textWidth) / 2;
+  int y = 40;
+
+  display.fillRect(x, y, textWidth, textHeight, WHITE); // Clear previous
   display.setCursor(x, y);
   display.setTextColor(BLACK);
   display.setTextSize(2);
-  display.print(randomNumberStr);
+  display.print("***");
 }
 
 void setup() {
@@ -78,7 +84,7 @@ void setup() {
   // Clear the screen
   display.fillScreen(WHITE);
 
-  // Generate and display the initial random number
+  // Generate and display the initial random number (as stars)
   generateNewRandomNumber();
 }
 
