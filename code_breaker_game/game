@@ -85,19 +85,26 @@ void loop() {
     if (inputIndex == 3) {
       inputBuffer[3] = '\0'; // Null-terminate
 
-      // Compare inputBuffer to randomNumberStr
-      int matchCount = 0;
-      for (int i = 0; i < 3; i++) {
-        if (inputBuffer[i] == randomNumberStr[i]) {
-          matchCount++;
+      // Check if input matches the random number
+      if (strcmp(inputBuffer, randomNumberStr) == 0) {
+        Serial.println("You won!");
+        Serial.println("Creating a new challenge.");
+        // Do not create a new number yet
+      } else {
+        // Compare inputBuffer to randomNumberStr for matches
+        int matchCount = 0;
+        for (int i = 0; i < 3; i++) {
+          if (inputBuffer[i] == randomNumberStr[i]) {
+            matchCount++;
+          }
         }
+        Serial.print("Input: ");
+        Serial.print(inputBuffer);
+        Serial.print(" | Random: ");
+        Serial.print(randomNumberStr);
+        Serial.print(" | Matches: ");
+        Serial.println(matchCount);
       }
-      Serial.print("Input: ");
-      Serial.print(inputBuffer);
-      Serial.print(" | Random: ");
-      Serial.print(randomNumberStr);
-      Serial.print(" | Matches: ");
-      Serial.println(matchCount);
 
       inputIndex = 0; // Reset for next 3 keys
     }
