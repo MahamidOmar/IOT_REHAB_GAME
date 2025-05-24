@@ -1,0 +1,69 @@
+#define BUTTON_RED   18
+#define BUTTON_BLUE  19
+#define BUTTON_GREEN 21
+
+const int SEQUENCE_LENGTH = 6;
+int colorSequence[SEQUENCE_LENGTH];
+int currentStep = 0;
+bool gameActive = true;
+
+int lastButtonState[3] = {HIGH, HIGH, HIGH};
+const unsigned long debounceDelay = 300; // Increased debounce delay
+unsigned long lastDebounceTime[3] = {0, 0, 0};
+
+void setup() {
+  Serial.begin(9600);
+  delay(2000); // Wait for Serial Monitor to connect
+
+  pinMode(BUTTON_RED, INPUT_PULLUP);
+  pinMode(BUTTON_BLUE, INPUT_PULLUP);
+  pinMode(BUTTON_GREEN, INPUT_PULLUP);
+
+  randomSeed(analogRead(0));
+
+  for (int i = 0; i < SEQUENCE_LENGTH; i++) {
+    colorSequence[i] = random(0, 3); // 0=Red, 1=Blue, 2=Green
+  }
+
+  Serial.print("Generated color sequence: ");
+  for (int i = 0; i < SEQUENCE_LENGTH; i++) {
+    switch (colorSequence[i]) {
+      case 0: Serial.print("Red "); break;
+      case 1: Serial.print("Blue "); break;
+      case 2: Serial.print("Green "); break;
+    }
+  }
+  Serial.println();
+}
+
+void loop() {
+  if (!gameActive) return;
+
+  int buttonPins[3] = {BUTTON_RED, BUTTON_BLUE, BUTTON_GREEN};
+  const char* buttonNames[3] = {"Red Button Pressed", "Blue Button Pressed", "Green Button Pressed"};
+
+  for (int i = 0; i < 3; i++) {
+    int reading = digitalRead(buttonPins[i]);
+
+    // Only act on the transition from HIGH to LOW (button press event)
+    if (lastButtonState[i] == HIGH && reading == LOW && (millis() - lastDebounceTime[i]) > debounceDelay) {
+      lastDebounceTime[i] = millis();
+
+      // Print which button was pressed
+      Serial.println(buttonNames[i]);
+
+      // Game logic
+      if (i == colorSequence[currentStep]) {
+        currentStep++;
+        if (currentStep == SEQUENCE_LENGTH) {
+          Serial.println("Success");
+          gameActive = false;
+        }
+      } else {
+        Serial.println("Wrong sequence try again");
+        currentStep = 0;
+      }
+    }
+    lastButtonState[i] = reading;
+  }
+}
