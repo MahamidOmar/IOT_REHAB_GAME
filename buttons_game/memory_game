@@ -1,6 +1,7 @@
 #define BUTTON_RED   18
 #define BUTTON_BLUE  19
 #define BUTTON_GREEN 21
+#define LED_PIN      2    // External LED connected to GPIO 2
 
 const int SEQUENCE_LENGTH = 6;
 int colorSequence[SEQUENCE_LENGTH];
@@ -8,7 +9,7 @@ int currentStep = 0;
 bool gameActive = true;
 
 int lastButtonState[3] = {HIGH, HIGH, HIGH};
-const unsigned long debounceDelay = 300; // Increased debounce delay
+const unsigned long debounceDelay = 300;
 unsigned long lastDebounceTime[3] = {0, 0, 0};
 
 void setup() {
@@ -18,6 +19,7 @@ void setup() {
   pinMode(BUTTON_RED, INPUT_PULLUP);
   pinMode(BUTTON_BLUE, INPUT_PULLUP);
   pinMode(BUTTON_GREEN, INPUT_PULLUP);
+  pinMode(LED_PIN, OUTPUT);
 
   randomSeed(analogRead(0));
 
@@ -36,6 +38,26 @@ void setup() {
     }
   }
   Serial.println();
+
+  // Show the sequence on the external LED (print color to Serial)
+  for (int i = 0; i < SEQUENCE_LENGTH; i++) {
+    switch (colorSequence[i]) {
+      case 0: Serial.println("Showing RED"); break;
+      case 1: Serial.println("Showing BLUE"); break;
+      case 2: Serial.println("Showing GREEN"); break;
+    }
+    // Blink the LED for 3 seconds (250ms ON, 250ms OFF)
+    unsigned long startTime = millis();
+    while (millis() - startTime < 3000) {
+      digitalWrite(LED_PIN, HIGH);
+      delay(250);
+      digitalWrite(LED_PIN, LOW);
+      delay(250);
+    }
+    // Pause for 1 second between colors
+    digitalWrite(LED_PIN, LOW);
+    delay(1000);
+  }
 }
 
 void loop() {
