@@ -15,7 +15,7 @@
 // RGB Button pin definitions
 #define RED_BUTTON_PIN    4
 #define BLUE_BUTTON_PIN   22
-#define GREEN_BUTTON_PIN  26
+#define GREEN_BUTTON_PIN  5
 
 // Visual Memory Game
 #define MAX_SEQUENCE_LENGTH 10
@@ -55,8 +55,12 @@ byte currentPlayer = 0;
 // Visual memory game sequence
 uint8_t colorSequence[MAX_SEQUENCE_LENGTH];
 uint8_t colorSequenceLength = 5; // For example, 5 steps
-uint8_t userSequence[MAX_SEQUENCE_LENGTH];
-uint8_t userInputIndex = 0;
+uint8_t currentStep = 0;
+
+// Debounce variables for 3 buttons
+unsigned long lastDebounceTime[3] = {0, 0, 0};
+const unsigned long debounceDelay = 200; // 200ms debounce
+int lastButtonState[3] = {HIGH, HIGH, HIGH};
 
 // State machine
 enum State { PLAYER_SELECT, MENU, CODE_BREAKER, VISUAL_MEMORY, VISUAL_MEMORY_INPUT, VISUAL_MEMORY_RESULT };
@@ -185,6 +189,29 @@ void showLastTry(const char* guess) {
   display.print(guess);
 }
 
+// --- New: Show input progress (underscores/digits) ---
+void showInputProgress(const char* inputBuffer, byte inputIndex) {
+  int y = 190; // Under "Last try"
+  int numChars = 3;
+  int charWidth = 12; // setTextSize(2): 6*2=12 pixels per char
+  int totalWidth = numChars * charWidth + (numChars - 1) * charWidth / 2;
+  int x = (SCREEN_WIDTH - totalWidth) / 2;
+
+  display.setTextSize(2);
+  display.setTextColor(BLACK);
+  display.fillRect(0, y, SCREEN_WIDTH, 30, WHITE);
+
+  display.setCursor(x, y);
+  for (int i = 0; i < 3; i++) {
+    if (i < inputIndex) {
+      display.print(inputBuffer[i]);
+    } else {
+      display.print("_");
+    }
+    if (i < 2) display.print(" ");
+  }
+}
+
 void showGeneratingNew() {
   int y = 150;
   display.fillRect(0, y, SCREEN_WIDTH, 30, WHITE);
@@ -299,6 +326,7 @@ void loop() {
           showCodeBreakerTitle();
           generateNewRandomNumber();
           inputIndex = 0;
+          showInputProgress(inputBuffer, inputIndex); // Reset input progress
           currentState = CODE_BREAKER;
         } else if (key == '2') {
           // Visual memory game: generate sequence, show on screen, then wait for input
@@ -314,6 +342,11 @@ void loop() {
           for (uint8_t i = 0; i < colorSequenceLength; i++) {
             showColorOnDisplay(colorSequence[i]);
             delay(2000);
+            // Show white screen for 1 second between colors, except after last color
+            if (i < colorSequenceLength - 1) {
+              display.fillScreen(WHITE);
+              delay(1000);
+            }
           }
           display.fillScreen(WHITE);
           display.setTextColor(BLACK);
@@ -321,7 +354,9 @@ void loop() {
           display.setCursor(20, 100);
           display.print("Repeat the sequence!");
           showBottomHints();
-          userInputIndex = 0;
+          currentStep = 0;
+          // Reset debounce state
+          lastButtonState[0] = lastButtonState[1] = lastButtonState[2] = HIGH;
           currentState = VISUAL_MEMORY_INPUT;
         } else {
           showMenuMessage("Please choose 1 or 2");
@@ -329,32 +364,29 @@ void loop() {
       }
       break;
 
-    case VISUAL_MEMORY_INPUT:
-      // Read RGB buttons
-      if (userInputIndex < colorSequenceLength) {
-        if (digitalRead(RED_BUTTON_PIN) == LOW) {
-          userSequence[userInputIndex++] = 0;
-          while (digitalRead(RED_BUTTON_PIN) == LOW); // Wait for release
-        } else if (digitalRead(BLUE_BUTTON_PIN) == LOW) {
-          userSequence[userInputIndex++] = 1;
-          while (digitalRead(BLUE_BUTTON_PIN) == LOW);
-        } else if (digitalRead(GREEN_BUTTON_PIN) == LOW) {
-          userSequence[userInputIndex++] = 2;
-          while (digitalRead(GREEN_BUTTON_PIN) == LOW);
-        }
-      }
-      if (userInputIndex == colorSequenceLength) {
-        // Check result
-        bool correct = true;
-        for (uint8_t i = 0; i < colorSequenceLength; i++) {
-          if (userSequence[i] != colorSequence[i]) {
-            correct = false;
-            break;
+    case VISUAL_MEMORY_INPUT: {
+      int buttonPins[3] = {RED_BUTTON_PIN, BLUE_BUTTON_PIN, GREEN_BUTTON_PIN};
+      const char* buttonNames[3] = {"Red button pressed", "Blue button pressed", "Green button pressed"};
+      for (int i = 0; i < 3; i++) {
+        int reading = digitalRead(buttonPins[i]);
+        if (lastButtonState[i] == HIGH && reading == LOW && (millis() - lastDebounceTime[i]) > debounceDelay) {
+          lastDebounceTime[i] = millis();
+          Serial.println(buttonNames[i]);
+          if (i == colorSequence[currentStep]) {
+            currentStep++;
+            if (currentStep == colorSequenceLength) {
+              Serial.println("Success");
+              showVisualMemoryResult(true);
+            }
+          } else {
+            Serial.println("Wrong sequence try again");
+            currentStep = 0;
           }
         }
-        showVisualMemoryResult(correct);
+        lastButtonState[i] = reading;
       }
       break;
+    }
 
     case CODE_BREAKER:
       if (key) {
@@ -362,21 +394,26 @@ void loop() {
           showMenu();
           currentState = MENU;
           inputIndex = 0;
+          showInputProgress(inputBuffer, inputIndex); // Clear progress
           break;
         }
         if (key == '#') {
           showPlayerMenu();
           currentState = PLAYER_SELECT;
           inputIndex = 0;
+          showInputProgress(inputBuffer, inputIndex); // Clear progress
           break;
         }
+        // Normal game logic
         if (inputIndex < 3 && key >= '0' && key <= '9') {
           inputBuffer[inputIndex++] = key;
+          showInputProgress(inputBuffer, inputIndex);
         }
         if (inputIndex == 3) {
           inputBuffer[3] = '\0';
+
           if (strcmp(inputBuffer, randomNumberStr) == 0) {
-            showCodeBreakerResult(3, 0);
+            showCodeBreakerResult(3, 0); // All exact
             showGeneratingNew();
             Serial.println("You won!");
             delay(1500);
@@ -384,8 +421,10 @@ void loop() {
           } else {
             int exact = 0, partial = 0;
             countMatches(inputBuffer, randomNumberStr, exact, partial);
+
             showCodeBreakerResult(exact, partial);
             showLastTry(inputBuffer);
+
             Serial.print("Input: ");
             Serial.print(inputBuffer);
             Serial.print(" | Random: ");
@@ -396,6 +435,7 @@ void loop() {
             Serial.println(partial);
           }
           inputIndex = 0;
+          showInputProgress(inputBuffer, inputIndex); // Reset progress display
         }
       }
       break;
