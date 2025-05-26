@@ -23,6 +23,7 @@ char keys[ROWS][COLS] = {
   {'*','0','#'}
 };
 
+// Updated pin assignments for keypad
 byte rowPins[ROWS] = {13, 12, 14, 27};
 byte colPins[COLS] = {25, 33, 32};
 
@@ -104,6 +105,9 @@ void generateNewRandomNumber() {
   display.setTextColor(BLACK);
   display.setTextSize(2);
   display.print("***");
+
+  // Clear last try and result areas
+  display.fillRect(0, 90, SCREEN_WIDTH, 60, WHITE);
 }
 
 void showCodeBreakerResult(const char* msg) {
@@ -114,6 +118,25 @@ void showCodeBreakerResult(const char* msg) {
   display.setTextColor(BLUE);
   display.setTextSize(2);
   display.print(msg);
+}
+
+void showLastTry(const char* guess) {
+  int y = 120;
+  display.fillRect(0, y, SCREEN_WIDTH, 30, WHITE);
+  display.setTextColor(DARKGREY);
+  display.setTextSize(2);
+  display.setCursor(20, y);
+  display.print("Last try: ");
+  display.print(guess);
+}
+
+void showGeneratingNew() {
+  int y = 120;
+  display.fillRect(0, y, SCREEN_WIDTH, 30, WHITE);
+  display.setTextColor(GREEN);
+  display.setTextSize(2);
+  display.setCursor(20, y);
+  display.print("Generating new...");
 }
 
 void setup() {
@@ -156,6 +179,7 @@ void loop() {
 
           if (strcmp(inputBuffer, randomNumberStr) == 0) {
             showCodeBreakerResult("Success");
+            showGeneratingNew();
             Serial.println("You won!");
             delay(1500);
             generateNewRandomNumber(); // Generate and display a new number
@@ -170,6 +194,7 @@ void loop() {
             char buf[32];
             snprintf(buf, sizeof(buf), "Matches: %d", matchCount);
             showCodeBreakerResult(buf);
+            showLastTry(inputBuffer);
 
             Serial.print("Input: ");
             Serial.print(inputBuffer);
@@ -177,7 +202,6 @@ void loop() {
             Serial.print(randomNumberStr);
             Serial.print(" | Matches: ");
             Serial.println(matchCount);
-
             // Do NOT generate a new number, let user try again
           }
           inputIndex = 0; // Reset for next 3 keys
