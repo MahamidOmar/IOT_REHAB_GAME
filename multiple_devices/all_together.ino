@@ -23,7 +23,6 @@ char keys[ROWS][COLS] = {
   {'*','0','#'}
 };
 
-// Updated pin assignments for keypad
 byte rowPins[ROWS] = {13, 12, 14, 27};
 byte colPins[COLS] = {25, 33, 32};
 
@@ -40,11 +39,42 @@ byte inputIndex = 0;
 // Store the random number as a string for comparison
 char randomNumberStr[4];
 
+// Player selection
+byte currentPlayer = 0;
+
 // State machine
-enum State { MENU, CODE_BREAKER };
-State currentState = MENU;
+enum State { PLAYER_SELECT, MENU, CODE_BREAKER };
+State currentState = PLAYER_SELECT;
 
 // --- Display helpers ---
+void showPlayerMenu() {
+  display.fillScreen(WHITE);
+  display.setTextColor(BLACK);
+  display.setTextSize(2);
+
+  display.setCursor(20, 60);
+  display.print("Select player:");
+  display.setCursor(20, 100);
+  display.print("1) Player 1");
+  display.setCursor(20, 130);
+  display.print("2) Player 2");
+  display.setCursor(20, 160);
+  display.print("3) Player 3");
+  display.setCursor(20, 190);
+  display.print("4) Player 4");
+}
+
+void showPlayerSelected(byte player) {
+  display.fillScreen(WHITE);
+  display.setTextColor(GREEN);
+  display.setTextSize(2);
+  display.setCursor(20, 100);
+  display.print("Player ");
+  display.print(player);
+  display.print(" selected");
+  delay(1200);
+}
+
 void showMenu() {
   display.fillScreen(WHITE);
   display.setTextColor(BLACK);
@@ -62,7 +92,6 @@ void showMenu() {
 }
 
 void showMenuMessage(const char* msg) {
-  // Clear message area (bottom of the screen)
   int msgHeight = 40;
   display.fillRect(0, SCREEN_HEIGHT - msgHeight, SCREEN_WIDTH, msgHeight, WHITE);
   display.setTextColor(BLUE);
@@ -77,7 +106,7 @@ void showCodeBreakerTitle() {
   display.setTextSize(2);
   display.setCursor(30, 100);
   display.print("Code breaker game");
-  delay(2000); // Show for 2 seconds
+  delay(2000);
   display.fillScreen(WHITE);
 }
 
@@ -85,43 +114,46 @@ void generateNewRandomNumber() {
   int randomNumber = random(0, 1000);
   snprintf(randomNumberStr, sizeof(randomNumberStr), "%03d", randomNumber);
 
-  // Print the new random number to the Serial Monitor
   Serial.print("New random number: ");
   Serial.println(randomNumberStr);
 
-  // Clear just the area where the stars are displayed
   int charWidth = 6 * 2;
   int charHeight = 8 * 2;
   int numChars = 3;
   int textWidth = charWidth * numChars;
   int textHeight = charHeight;
 
-  // Move the stars higher up (e.g., 40 pixels from the top)
   int x = (SCREEN_WIDTH - textWidth) / 2;
   int y = 40;
 
-  display.fillRect(x, y, textWidth, textHeight, WHITE); // Clear previous
+  display.fillRect(x, y, textWidth, textHeight, WHITE);
   display.setCursor(x, y);
   display.setTextColor(BLACK);
   display.setTextSize(2);
   display.print("***");
 
-  // Clear last try and result areas
-  display.fillRect(0, 90, SCREEN_WIDTH, 60, WHITE);
+  display.fillRect(0, 90, SCREEN_WIDTH, 90, WHITE); // Clear result/last try area
 }
 
-void showCodeBreakerResult(const char* msg) {
-  // Show result message below the stars
+void showCodeBreakerResult(int exact, int partial) {
   int y = 90;
-  display.fillRect(0, y, SCREEN_WIDTH, 30, WHITE);
-  display.setCursor(20, y);
-  display.setTextColor(BLUE);
+  display.fillRect(0, y, SCREEN_WIDTH, 60, WHITE); // Clear both lines
+
   display.setTextSize(2);
-  display.print(msg);
+
+  display.setTextColor(GREEN); // Exact in green
+  display.setCursor(20, y);
+  display.print("Exact: ");
+  display.print(exact);
+
+  display.setTextColor(YELLOW); // Partial in yellow
+  display.setCursor(20, y + 30); // Next line
+  display.print("Partial: ");
+  display.print(partial);
 }
 
 void showLastTry(const char* guess) {
-  int y = 120;
+  int y = 150;
   display.fillRect(0, y, SCREEN_WIDTH, 30, WHITE);
   display.setTextColor(DARKGREY);
   display.setTextSize(2);
@@ -131,7 +163,7 @@ void showLastTry(const char* guess) {
 }
 
 void showGeneratingNew() {
-  int y = 120;
+  int y = 150;
   display.fillRect(0, y, SCREEN_WIDTH, 30, WHITE);
   display.setTextColor(GREEN);
   display.setTextSize(2);
@@ -139,18 +171,55 @@ void showGeneratingNew() {
   display.print("Generating new...");
 }
 
+// --- Matching logic ---
+void countMatches(const char* guess, const char* answer, int& exact, int& partial) {
+  exact = 0;
+  partial = 0;
+  bool answer_used[3] = {false, false, false};
+  bool guess_used[3] = {false, false, false};
+
+  // First pass: exact matches
+  for (int i = 0; i < 3; i++) {
+    if (guess[i] == answer[i]) {
+      exact++;
+      answer_used[i] = true;
+      guess_used[i] = true;
+    }
+  }
+  // Second pass: partial matches
+  for (int i = 0; i < 3; i++) {
+    if (guess_used[i]) continue;
+    for (int j = 0; j < 3; j++) {
+      if (!answer_used[j] && guess[i] == answer[j]) {
+        partial++;
+        answer_used[j] = true;
+        break;
+      }
+    }
+  }
+}
+
 void setup() {
   Serial.begin(9600);
   display.begin();
-  display.setRotation(0); // Portrait: 240x320
+  display.setRotation(0);
   randomSeed(analogRead(0));
-  showMenu();
-  currentState = MENU;
+  showPlayerMenu();
+  currentState = PLAYER_SELECT;
 }
 
 void loop() {
   char key = keypad.getKey();
   switch (currentState) {
+    case PLAYER_SELECT:
+      if (key && key >= '1' && key <= '4') {
+        currentPlayer = key - '0';
+        showPlayerSelected(currentPlayer);
+        showMenu();
+        currentState = MENU;
+      }
+      break;
+
     case MENU:
       if (key) {
         Serial.print("Key pressed: ");
@@ -175,36 +244,31 @@ void loop() {
           inputBuffer[inputIndex++] = key;
         }
         if (inputIndex == 3) {
-          inputBuffer[3] = '\0'; // Null-terminate
+          inputBuffer[3] = '\0';
 
           if (strcmp(inputBuffer, randomNumberStr) == 0) {
-            showCodeBreakerResult("Success");
+            showCodeBreakerResult(3, 0); // All exact
             showGeneratingNew();
             Serial.println("You won!");
             delay(1500);
-            generateNewRandomNumber(); // Generate and display a new number
+            generateNewRandomNumber();
           } else {
-            // Compare inputBuffer to randomNumberStr for matches
-            int matchCount = 0;
-            for (int i = 0; i < 3; i++) {
-              if (inputBuffer[i] == randomNumberStr[i]) {
-                matchCount++;
-              }
-            }
-            char buf[32];
-            snprintf(buf, sizeof(buf), "Matches: %d", matchCount);
-            showCodeBreakerResult(buf);
+            int exact = 0, partial = 0;
+            countMatches(inputBuffer, randomNumberStr, exact, partial);
+
+            showCodeBreakerResult(exact, partial);
             showLastTry(inputBuffer);
 
             Serial.print("Input: ");
             Serial.print(inputBuffer);
             Serial.print(" | Random: ");
             Serial.print(randomNumberStr);
-            Serial.print(" | Matches: ");
-            Serial.println(matchCount);
-            // Do NOT generate a new number, let user try again
+            Serial.print(" | Exact: ");
+            Serial.print(exact);
+            Serial.print(" | Partial: ");
+            Serial.println(partial);
           }
-          inputIndex = 0; // Reset for next 3 keys
+          inputIndex = 0;
         }
       }
       break;
