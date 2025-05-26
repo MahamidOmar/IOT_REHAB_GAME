@@ -380,6 +380,23 @@ void loop() {
             }
           } else {
             Serial.println("Wrong sequence try again");
+            // Show message on display
+            display.fillScreen(WHITE);
+            display.setTextSize(2);
+            display.setTextColor(RED);
+            display.setCursor(20, 120);
+            display.print("Wrong sequence");
+            display.setCursor(20, 150);
+            display.print("try again");
+            showBottomHints();
+            delay(1500); // Show message for 1.5s
+            // Reset prompt
+            display.fillScreen(WHITE);
+            display.setTextColor(BLACK);
+            display.setTextSize(2);
+            display.setCursor(20, 100);
+            display.print("Repeat the sequence!");
+            showBottomHints();
             currentStep = 0;
           }
         }
