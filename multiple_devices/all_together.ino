@@ -46,27 +46,17 @@ Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 Arduino_ESP32SPI bus(TFT_DC, TFT_CS, TFT_SCLK, TFT_MOSI, TFT_MISO);
 Arduino_ILI9341 display(&bus, TFT_RST);
 
-// Buffer for storing 3 keys
 char inputBuffer[4]; // 3 chars + null terminator
 byte inputIndex = 0;
-
-// Store the random number as a string for comparison
 char randomNumberStr[4];
-
-// Player selection
 byte currentPlayer = 0;
-
-// Visual memory game sequence
 uint8_t colorSequence[MAX_SEQUENCE_LENGTH];
-uint8_t colorSequenceLength = 5; // For example, 5 steps
+uint8_t colorSequenceLength = 5;
 uint8_t currentStep = 0;
-
-// Debounce variables for 3 buttons
 unsigned long lastDebounceTime[3] = {0, 0, 0};
-const unsigned long debounceDelay = 200; // 200ms debounce
+const unsigned long debounceDelay = 200;
 int lastButtonState[3] = {HIGH, HIGH, HIGH};
 
-// State machine
 enum State { PLAYER_SELECT, MENU, CODE_BREAKER, VISUAL_MEMORY, VISUAL_MEMORY_INPUT, VISUAL_MEMORY_RESULT };
 State currentState = PLAYER_SELECT;
 
@@ -80,7 +70,7 @@ const char* projectId   = "iot-rehab-game";
 const char* apiKey      = "AIzaSyBXmChDOo054ZKjiiCma295qYqMzf7kjZs";
 const char* collection  = "Players";
 
-#define MAX_PLAYERS 4 // Adjusted to 4
+#define MAX_PLAYERS 4
 
 String playerNames[MAX_PLAYERS];
 int playerCount = 0;
@@ -192,11 +182,10 @@ void showLastTry(const char* guess) {
   display.print(guess);
 }
 
-// --- New: Show input progress (underscores/digits) ---
 void showInputProgress(const char* inputBuffer, byte inputIndex) {
-  int y = 190; // Under "Last try"
+  int y = 190;
   int numChars = 3;
-  int charWidth = 12; // setTextSize(2): 6*2=12 pixels per char
+  int charWidth = 12;
   int totalWidth = numChars * charWidth + (numChars - 1) * charWidth / 2;
   int x = (SCREEN_WIDTH - totalWidth) / 2;
 
@@ -224,7 +213,6 @@ void showGeneratingNew() {
   display.print("Generating new...");
 }
 
-// --- Matching logic ---
 void countMatches(const char* guess, const char* answer, int& exact, int& partial) {
   exact = 0;
   partial = 0;
@@ -249,12 +237,10 @@ void countMatches(const char* guess, const char* answer, int& exact, int& partia
   }
 }
 
-// --- Visual Memory Game: Generate, show, and check sequence ---
 void generateRandomColorSequence(uint8_t sequence[], uint8_t length) {
   for (uint8_t i = 0; i < length; i++) {
-    sequence[i] = random(0, 3); // 0 = Red, 1 = Blue, 2 = Green
+    sequence[i] = random(0, 3);
   }
-  // Print to Serial
   Serial.print("Color sequence: ");
   for (uint8_t i = 0; i < length; i++) {
     Serial.print(colorNames[sequence[i]]);
@@ -322,7 +308,6 @@ void fetchPlayersFromFirestore() {
     Serial.println(error.c_str());
   }
 
-  // Print names to Serial
   Serial.println("Player names:");
   for (int i = 0; i < playerCount; i++) {
     Serial.println(playerNames[i]);
@@ -331,6 +316,9 @@ void fetchPlayersFromFirestore() {
 
 // Show player selection menu with fetched names
 void showPlayerMenu() {
+  inputIndex = 0;
+  inputBuffer[0] = inputBuffer[1] = inputBuffer[2] = inputBuffer[3] = '\0';
+
   display.fillScreen(WHITE);
   display.setTextColor(BLACK);
   display.setTextSize(2);
@@ -350,7 +338,6 @@ void setup() {
   display.setRotation(0);
   randomSeed(analogRead(0));
 
-    // WPA2-Enterprise WiFi Setup
   WiFi.disconnect(true);
   WiFi.mode(WIFI_STA);
   esp_wifi_sta_wpa2_ent_set_identity((uint8_t *)WIFI_USERNAME, strlen(WIFI_USERNAME));
@@ -365,9 +352,9 @@ void setup() {
     delay(500);
   }
   Serial.println("\nWiFi connected!");
-  
-  fetchPlayersFromFirestore(); // Fetch players from Firestore
-  showPlayerMenu();          // Display the player selection menu
+
+  fetchPlayersFromFirestore();
+  showPlayerMenu();
 
   currentState = PLAYER_SELECT;
 
@@ -393,7 +380,6 @@ void loop() {
         if (key == '#') {
           showPlayerMenu();
           currentState = PLAYER_SELECT;
-          inputIndex = 0;
           break;
         }
         Serial.print("Key pressed: ");
@@ -403,10 +389,9 @@ void loop() {
           showCodeBreakerTitle();
           generateNewRandomNumber();
           inputIndex = 0;
-          showInputProgress(inputBuffer, inputIndex); // Reset input progress
+          showInputProgress(inputBuffer, inputIndex);
           currentState = CODE_BREAKER;
         } else if (key == '2') {
-          // Visual memory game: generate sequence, show on screen, then wait for input
           display.fillScreen(WHITE);
           display.setTextColor(BLUE);
           display.setTextSize(2);
@@ -419,7 +404,6 @@ void loop() {
           for (uint8_t i = 0; i < colorSequenceLength; i++) {
             showColorOnDisplay(colorSequence[i]);
             delay(2000);
-            // Show white screen for 1 second between colors, except after last color
             if (i < colorSequenceLength - 1) {
               display.fillScreen(WHITE);
               delay(1000);
@@ -432,7 +416,6 @@ void loop() {
           display.print("Repeat the sequence!");
           showBottomHints();
           currentStep = 0;
-          // Reset debounce state
           lastButtonState[0] = lastButtonState[1] = lastButtonState[2] = HIGH;
           currentState = VISUAL_MEMORY_INPUT;
         } else {
@@ -457,7 +440,6 @@ void loop() {
             }
           } else {
             Serial.println("Wrong sequence try again");
-            // Show message on display
             display.fillScreen(WHITE);
             display.setTextSize(2);
             display.setTextColor(RED);
@@ -466,8 +448,7 @@ void loop() {
             display.setCursor(20, 150);
             display.print("try again");
             showBottomHints();
-            delay(1500); // Show message for 1.5s
-            // Reset prompt
+            delay(1500);
             display.fillScreen(WHITE);
             display.setTextColor(BLACK);
             display.setTextSize(2);
@@ -488,17 +469,15 @@ void loop() {
           showMenu();
           currentState = MENU;
           inputIndex = 0;
-          showInputProgress(inputBuffer, inputIndex); // Clear progress
+          showInputProgress(inputBuffer, inputIndex);
           break;
         }
         if (key == '#') {
           showPlayerMenu();
           currentState = PLAYER_SELECT;
-          inputIndex = 0;
-          showInputProgress(inputBuffer, inputIndex); // Clear progress
+          // No call to showInputProgress here!
           break;
         }
-        // Normal game logic
         if (inputIndex < 3 && key >= '0' && key <= '9') {
           inputBuffer[inputIndex++] = key;
           showInputProgress(inputBuffer, inputIndex);
@@ -507,7 +486,7 @@ void loop() {
           inputBuffer[3] = '\0';
 
           if (strcmp(inputBuffer, randomNumberStr) == 0) {
-            showCodeBreakerResult(3, 0); // All exact
+            showCodeBreakerResult(3, 0);
             showGeneratingNew();
             Serial.println("You won!");
             delay(1500);
@@ -529,7 +508,7 @@ void loop() {
             Serial.println(partial);
           }
           inputIndex = 0;
-          showInputProgress(inputBuffer, inputIndex); // Reset progress display
+          showInputProgress(inputBuffer, inputIndex);
         }
       }
       break;
