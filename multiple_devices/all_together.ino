@@ -1,5 +1,9 @@
 #include <Arduino_GFX_Library.h>
 #include <Keypad.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include "esp_wpa2.h" // Only needed for WPA2-Enterprise
 
 // --- PIN DEFINITIONS (TOP) ---
 #define TFT_SCLK  18
@@ -66,6 +70,21 @@ int lastButtonState[3] = {HIGH, HIGH, HIGH};
 enum State { PLAYER_SELECT, MENU, CODE_BREAKER, VISUAL_MEMORY, VISUAL_MEMORY_INPUT, VISUAL_MEMORY_RESULT };
 State currentState = PLAYER_SELECT;
 
+// WiFi credentials (for WPA2-Enterprise)
+#define WIFI_SSID      "eduroam"
+#define WIFI_USERNAME  "omarm@campus.technion.ac.il"
+#define WIFI_PASSWORD  "JonSnow04112001#"
+
+// Firestore info
+const char* projectId   = "iot-rehab-game";
+const char* apiKey      = "AIzaSyBXmChDOo054ZKjiiCma295qYqMzf7kjZs";
+const char* collection  = "Players";
+
+#define MAX_PLAYERS 4 // Adjusted to 4
+
+String playerNames[MAX_PLAYERS];
+int playerCount = 0;
+
 // --- Display helpers ---
 void showBottomHints() {
   display.setTextSize(1);
@@ -79,22 +98,6 @@ void showBottomHints() {
   display.getTextBounds(logoutText, 0, 0, &x1, &y1, &w, &h);
   display.setCursor(SCREEN_WIDTH - w, y);
   display.print(logoutText);
-}
-
-void showPlayerMenu() {
-  display.fillScreen(WHITE);
-  display.setTextColor(BLACK);
-  display.setTextSize(2);
-  display.setCursor(20, 60);
-  display.print("Select player:");
-  display.setCursor(20, 100);
-  display.print("1) Player 1");
-  display.setCursor(20, 130);
-  display.print("2) Player 2");
-  display.setCursor(20, 160);
-  display.print("3) Player 3");
-  display.setCursor(20, 190);
-  display.print("4) Player 4");
 }
 
 void showPlayerSelected(byte player) {
@@ -286,12 +289,86 @@ void showVisualMemoryResult(bool correct) {
   currentState = MENU;
 }
 
+// Fetch and parse player names from Firestore
+void fetchPlayersFromFirestore() {
+  String url = "https://firestore.googleapis.com/v1/projects/" + String(projectId) +
+               "/databases/(default)/documents/" + collection + "?key=" + apiKey;
+
+  HTTPClient http;
+  http.begin(url);
+  int httpResponseCode = http.GET();
+  String payload = http.getString();
+  http.end();
+
+  Serial.println("Firestore Players Collection Response:");
+  Serial.println(payload);
+
+  playerCount = 0;
+  StaticJsonDocument<8192> doc;
+  DeserializationError error = deserializeJson(doc, payload);
+
+  if (!error && doc.containsKey("documents")) {
+    JsonArray docs = doc["documents"].as<JsonArray>();
+    for (JsonObject d : docs) {
+      if (d.containsKey("fields") && d["fields"].containsKey("name")) {
+        String name = d["fields"]["name"]["stringValue"].as<String>();
+        if (playerCount < MAX_PLAYERS) {
+          playerNames[playerCount++] = name;
+        }
+      }
+    }
+  } else {
+    Serial.print("deserializeJson() failed or no documents: ");
+    Serial.println(error.c_str());
+  }
+
+  // Print names to Serial
+  Serial.println("Player names:");
+  for (int i = 0; i < playerCount; i++) {
+    Serial.println(playerNames[i]);
+  }
+}
+
+// Show player selection menu with fetched names
+void showPlayerMenu() {
+  display.fillScreen(WHITE);
+  display.setTextColor(BLACK);
+  display.setTextSize(2);
+  display.setCursor(20, 60);
+  display.print("Select player:");
+  int y = 100;
+  for (int i = 0; i < playerCount; i++) {
+    display.setCursor(20, y);
+    display.print(String(i + 1) + ") " + playerNames[i]);
+    y += 30;
+  }
+}
+
 void setup() {
   Serial.begin(9600);
   display.begin();
   display.setRotation(0);
   randomSeed(analogRead(0));
-  showPlayerMenu();
+
+    // WPA2-Enterprise WiFi Setup
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_STA);
+  esp_wifi_sta_wpa2_ent_set_identity((uint8_t *)WIFI_USERNAME, strlen(WIFI_USERNAME));
+  esp_wifi_sta_wpa2_ent_set_username((uint8_t *)WIFI_USERNAME, strlen(WIFI_USERNAME));
+  esp_wifi_sta_wpa2_ent_set_password((uint8_t *)WIFI_PASSWORD, strlen(WIFI_PASSWORD));
+  esp_wifi_sta_wpa2_ent_enable();
+  WiFi.begin(WIFI_SSID);
+
+  Serial.print("Connecting to WPA2-Enterprise Wi-Fi");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
+  Serial.println("\nWiFi connected!");
+  
+  fetchPlayersFromFirestore(); // Fetch players from Firestore
+  showPlayerMenu();          // Display the player selection menu
+
   currentState = PLAYER_SELECT;
 
   pinMode(RED_BUTTON_PIN, INPUT_PULLUP);
@@ -303,7 +380,7 @@ void loop() {
   char key = keypad.getKey();
   switch (currentState) {
     case PLAYER_SELECT:
-      if (key && key >= '1' && key <= '4') {
+     if (key && key >= '1' && key <= '4' && key - '0' <= playerCount) {
         currentPlayer = key - '0';
         showPlayerSelected(currentPlayer);
         showMenu();
