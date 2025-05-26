@@ -222,6 +222,12 @@ void loop() {
 
     case MENU:
       if (key) {
+        if (key == '#') {
+          showPlayerMenu();
+          currentState = PLAYER_SELECT;
+          inputIndex = 0;
+          break;
+        }
         Serial.print("Key pressed: ");
         Serial.println(key);
 
@@ -240,6 +246,20 @@ void loop() {
 
     case CODE_BREAKER:
       if (key) {
+        // Navigation
+        if (key == '*') {
+          showMenu();
+          currentState = MENU;
+          inputIndex = 0;
+          break;
+        }
+        if (key == '#') {
+          showPlayerMenu();
+          currentState = PLAYER_SELECT;
+          inputIndex = 0;
+          break;
+        }
+        // Normal game logic
         if (inputIndex < 3 && key >= '0' && key <= '9') {
           inputBuffer[inputIndex++] = key;
         }
