@@ -12,7 +12,7 @@
 #define SCREEN_WIDTH  240
 #define SCREEN_HEIGHT 320
 
-// Set up the SPI bus and display using your variable names
+// Set up the SPI bus and display
 Arduino_ESP32SPI bus(TFT_DC, TFT_CS, TFT_SCLK, TFT_MOSI, TFT_MISO);
 Arduino_ILI9341 display(&bus, TFT_RST);
 
@@ -32,33 +32,37 @@ byte colPins[COLS] = {25, 33, 32};
 
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
-void setup() {
-  Serial.begin(9600);
-
-  display.begin();
-  display.setRotation(0); // Portrait: 240x320
+void showMenu() {
   display.fillScreen(WHITE);
-
   display.setTextColor(BLACK);
   display.setTextSize(2);
 
-  const char* msg = "Hello World";
-  int16_t x1, y1;
-  uint16_t w, h;
+  int y = 40;
+  display.setCursor(20, y);
+  display.print("Choose your game:");
+  y += 40;
+  display.setCursor(20, y);
+  display.print("1) Code breaker");
+  y += 30;
+  display.setCursor(20, y);
+  display.print("2) Visual memory");
+}
 
-  // Calculate text bounds to center the text
-  display.getTextBounds(msg, 0, 0, &x1, &y1, &w, &h);
-  int16_t x = (SCREEN_WIDTH - w) / 2;
-  int16_t y = (SCREEN_HEIGHT - h) / 2;
-
-  display.setCursor(x, y);
+void showMessage(const char* msg) {
+  // Clear message area (bottom of the screen)
+  int msgHeight = 40;
+  display.fillRect(0, SCREEN_HEIGHT - msgHeight, SCREEN_WIDTH, msgHeight, WHITE);
+  display.setTextColor(BLUE);
+  display.setTextSize(2);
+  display.setCursor(20, SCREEN_HEIGHT - msgHeight + 10);
   display.print(msg);
+}
 
-  // Draw a label for the key display area
-  display.setTextSize(1);
-  display.setTextColor(DARKGREY);
-  display.setCursor((SCREEN_WIDTH - 60) / 2, y + 40);
-  display.print("Last key pressed:");
+void setup() {
+  Serial.begin(9600);
+  display.begin();
+  display.setRotation(0); // Portrait: 240x320
+  showMenu();
 }
 
 void loop() {
@@ -67,24 +71,10 @@ void loop() {
     Serial.print("Key pressed: ");
     Serial.println(key);
 
-    // Clear the area where the key is displayed
-    int keyBoxWidth = 32;
-    int keyBoxHeight = 32;
-    int keyBoxX = (SCREEN_WIDTH - keyBoxWidth) / 2;
-    int keyBoxY = (SCREEN_HEIGHT / 2) + 60;
-
-    display.fillRect(keyBoxX, keyBoxY, keyBoxWidth, keyBoxHeight, WHITE);
-
-    // Draw the key in large font, centered in the box
-    display.setTextSize(3);
-    display.setTextColor(BLACK);
-    int16_t x1, y1;
-    uint16_t w, h;
-    char keyStr[2] = {key, '\0'};
-    display.getTextBounds(keyStr, 0, 0, &x1, &y1, &w, &h);
-    int textX = keyBoxX + (keyBoxWidth - w) / 2;
-    int textY = keyBoxY + (keyBoxHeight - h) / 2;
-    display.setCursor(textX, textY);
-    display.print(keyStr);
+    if (key == '1' || key == '2') {
+      showMessage("Good selection");
+    } else {
+      showMessage("Please choose 1 or 2");
+    }
   }
 }
