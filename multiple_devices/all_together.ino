@@ -47,6 +47,25 @@ enum State { PLAYER_SELECT, MENU, CODE_BREAKER };
 State currentState = PLAYER_SELECT;
 
 // --- Display helpers ---
+void showBottomHints() {
+  // Small font
+  display.setTextSize(1);
+  display.setTextColor(DARKGREY);
+
+  // Bottom left
+  int y = SCREEN_HEIGHT - 10;
+  display.setCursor(0, y);
+  display.print("* games menu");
+
+  // Bottom right
+  const char* logoutText = "# logout";
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(logoutText, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor(SCREEN_WIDTH - w, y);
+  display.print(logoutText);
+}
+
 void showPlayerMenu() {
   display.fillScreen(WHITE);
   display.setTextColor(BLACK);
@@ -89,6 +108,8 @@ void showMenu() {
   y += 30;
   display.setCursor(20, y);
   display.print("2) Visual memory");
+
+  showBottomHints();
 }
 
 void showMenuMessage(const char* msg) {
@@ -108,6 +129,7 @@ void showCodeBreakerTitle() {
   display.print("Code breaker game");
   delay(2000);
   display.fillScreen(WHITE);
+  showBottomHints();
 }
 
 void generateNewRandomNumber() {
@@ -133,6 +155,8 @@ void generateNewRandomNumber() {
   display.print("***");
 
   display.fillRect(0, 90, SCREEN_WIDTH, 90, WHITE); // Clear result/last try area
+
+  showBottomHints();
 }
 
 void showCodeBreakerResult(int exact, int partial) {
