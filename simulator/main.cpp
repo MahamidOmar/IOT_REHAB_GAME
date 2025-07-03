@@ -540,6 +540,19 @@ void loop() {
       break;
 
     case VISUAL_MEMORY_INPUT: {
+      // --- Handle keypad keys for menu/logout ---
+      if (key == '*') {
+        showMenu();
+        currentState = MENU;
+        break;
+      }
+      if (key == '#') {
+        showPlayerMenu();
+        currentState = PLAYER_SELECT;
+        break;
+      }
+
+      // --- Handle button presses for visual memory game ---
       int buttonPins[3] = {RED_BUTTON_PIN, BLUE_BUTTON_PIN, GREEN_BUTTON_PIN};
       const char* buttonNames[3] = {"Red button pressed", "Blue button pressed", "Green button pressed"};
       for (int i = 0; i < 3; i++) {
