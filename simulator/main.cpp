@@ -102,12 +102,17 @@ void showBottomHints() {
 
 void showPlayerSelected(byte player) {
   display.fillScreen(WHITE);
-  display.setTextColor(GREEN);
+  display.setTextColor(BLACK);
   display.setTextSize(2);
   display.setCursor(20, 100);
-  display.print("Player ");
-  display.print(player);
-  display.print(" selected");
+  display.print("Welcome back :)");
+  display.setCursor(20, 140);
+  // player is 1-based, array is 0-based
+  if (player >= 1 && player <= playerCount) {
+    display.print(playerNames[player - 1]);
+  } else {
+    display.print("Unknown Player");
+  }
   delay(1200);
 }
 
