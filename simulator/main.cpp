@@ -584,7 +584,9 @@ void loop() {
           showMenu();
           currentState = MENU;
           inputIndex = 0;
-          showInputProgress(inputBuffer, inputIndex);
+          // showInputProgress(inputBuffer, inputIndex);
+          int y = 190;
+          display.fillRect(0, y, SCREEN_WIDTH, 30, WHITE);
           break;
         }
         if (key == '#') {
