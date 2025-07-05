@@ -44,6 +44,13 @@ int colorWordWrongTries = 0;
 uint8_t colorWordCurrentStep = 0;
 const int colorWordMaxTries = 5; // same as sequence length
 
+// --- Led Reaction game variables ---
+unsigned long ledReactionStartTime = 0;
+const unsigned long ledReactionGameDuration = 30000; // 30 seconds in ms
+int ledReactionCorrect = 0;
+int ledReactionCurrentColor = 0; // 0=Red, 1=Blue, 2=Green
+bool ledReactionActive = false;
+
 // Keypad definitions
 const byte ROWS = 4;
 const byte COLS = 3;
@@ -82,8 +89,9 @@ enum State
   VISUAL_MEMORY,
   VISUAL_MEMORY_INPUT,
   VISUAL_MEMORY_RESULT,
-  COLOR_WORD_CHALLENGE, // <-- Added new state for the new game
-  COLOR_WORD_CHALLENGE_INPUT
+  COLOR_WORD_CHALLENGE,
+  COLOR_WORD_CHALLENGE_INPUT,
+  LED_REACTION
 };
 State currentState = PLAYER_SELECT;
 
@@ -191,6 +199,9 @@ void showMenu()
   y += 30;
   display.setCursor(20, y);
   display.print("3) Color Word");
+  y += 30;
+  display.setCursor(20, y);
+  display.print("4) Led Reaction");
   showBottomHints();
 }
 
@@ -212,6 +223,27 @@ void showCodeBreakerTitle()
   display.setCursor(30, 100);
   display.print("Code breaker game");
   delay(2000);
+  display.fillScreen(WHITE);
+  showBottomHints();
+}
+
+void showColorWordTitle()
+{
+  display.fillScreen(WHITE);
+  display.setTextColor(BLACK);
+  display.setTextSize(2);
+
+  const char *title = "Color Word";
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(title, 0, 0, &x1, &y1, &w, &h);
+  int x = (SCREEN_WIDTH - w) / 2;
+  int y = 100; // You can adjust this value for vertical position
+
+  display.setCursor(x, y);
+  display.print(title);
+  delay(2000);
+
   display.fillScreen(WHITE);
   showBottomHints();
 }
@@ -527,6 +559,47 @@ void showCenteredStarsAndScore(int stars)
   display.print(scoreStr);
 }
 
+// Show the title for the LED reaction game
+void showLedReactionTitle()
+{
+  display.fillScreen(WHITE);
+  display.setTextColor(BLACK);
+  display.setTextSize(2);
+
+  const char *title = "Led Reaction";
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(title, 0, 0, &x1, &y1, &w, &h);
+  int x = (SCREEN_WIDTH - w) / 2;
+  int y = 100; // Adjust vertically if you want
+
+  display.setCursor(x, y);
+  display.print(title);
+  delay(2000);
+
+  display.fillScreen(WHITE);
+  showBottomHints();
+}
+
+// Show the LED reaction color based on the index
+void showLedReactionColor(int colorIdx)
+{
+  // Show on screen
+  display.fillScreen(colorValues[colorIdx]);
+  display.setTextSize(3);
+  display.setTextColor(WHITE);
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(colorNames[colorIdx], 0, 0, &x1, &y1, &w, &h);
+  int x = (SCREEN_WIDTH - w) / 2;
+  int y = (SCREEN_HEIGHT - 3 * 8) / 2;
+  display.setCursor(x, y);
+  display.print(colorNames[colorIdx]);
+
+  // Show on LED ring
+  showColorOnRings(colorIdx);
+}
+
 void setup()
 {
   // Initialize NeoPixel LEDs
@@ -649,15 +722,8 @@ void loop()
       // --- Color-Word Challenge menu handler ---
       else if (key == '3')
       {
-        // Generate the two random color sequences for the challenge
+        showColorWordTitle(); // <-- Centered title with delay
         generateColorWordChallengeSequences(cwcSeq1, cwcSeq2, COLOR_WORD_CHALLENGE_LENGTH);
-        display.fillScreen(WHITE);
-        display.setTextColor(BLACK);
-        display.setTextSize(2);
-        display.setCursor(20, 100);
-        display.print("Color Word");
-        showBottomHints();
-        delay(1000);
         currentStep = 0;
         colorWordCurrentStep = 0;
         colorWordWrongTries = 0;
@@ -665,9 +731,19 @@ void loop()
         showColorWordChallengeStep(currentStep);
         currentState = COLOR_WORD_CHALLENGE;
       }
+      else if (key == '4')
+      {
+        showLedReactionTitle();
+        ledReactionCorrect = 0;
+        ledReactionActive = true;
+        ledReactionStartTime = millis();
+        ledReactionCurrentColor = random(0, 3);
+        showLedReactionColor(ledReactionCurrentColor);
+        currentState = LED_REACTION;
+      }
       else
       {
-        showMenuMessage("Please choose 1, 2 or 3");
+        showMenuMessage("Please choose 1, 2, 3 or 4");
       }
     }
     break;
@@ -825,6 +901,84 @@ void loop()
         }
       }
       lastButtonState[i] = reading;
+    }
+    break;
+  }
+
+  case LED_REACTION:
+  {
+    // End game if time is up
+    if (ledReactionActive && (millis() - ledReactionStartTime >= ledReactionGameDuration))
+    {
+      ledReactionActive = false;
+      turnOffAllRings();
+      display.fillScreen(WHITE);
+      display.setTextSize(2);
+      display.setTextColor(BLACK);
+      const char *msg = "Correct guesses:";
+      int16_t x1, y1;
+      uint16_t w, h;
+      display.getTextBounds(msg, 0, 0, &x1, &y1, &w, &h);
+      int x = (SCREEN_WIDTH - w) / 2;
+      int y = 120;
+      display.setCursor(x, y);
+      display.print(msg);
+      String scoreStr = String(ledReactionCorrect);
+      display.getTextBounds(scoreStr.c_str(), 0, 0, &x1, &y1, &w, &h);
+      x = (SCREEN_WIDTH - w) / 2;
+      y += 40;
+      display.setCursor(x, y);
+      display.print(scoreStr);
+      delay(2500);
+      showMenu();
+      currentState = MENU;
+      break;
+    }
+
+    // Allow exit to menu or logout
+    if (key == '*')
+    {
+      turnOffAllRings();
+      showMenu();
+      currentState = MENU;
+      ledReactionActive = false;
+      break;
+    }
+    if (key == '#')
+    {
+      turnOffAllRings();
+      showPlayerMenu();
+      currentState = PLAYER_SELECT;
+      ledReactionActive = false;
+      break;
+    }
+
+    // Button input handling (only if game is active)
+    if (ledReactionActive)
+    {
+      int buttonPins[3] = {RED_BUTTON_PIN, BLUE_BUTTON_PIN, GREEN_BUTTON_PIN};
+      for (int i = 0; i < 3; i++)
+      {
+        int reading = digitalRead(buttonPins[i]);
+        if (lastButtonState[i] == HIGH && reading == LOW && (millis() - lastDebounceTime[i]) > debounceDelay)
+        {
+          lastDebounceTime[i] = millis();
+          // Check if correct
+          if (i == ledReactionCurrentColor)
+          {
+            ledReactionCorrect++;
+          }
+          // Generate and show new color
+          int newColor;
+          do
+          {
+            newColor = random(0, 3);
+          } while (newColor == ledReactionCurrentColor); // Avoid same color twice in a row
+          ledReactionCurrentColor = newColor;
+          showLedReactionColor(ledReactionCurrentColor);
+        }
+        lastButtonState[i] = reading;
+      }
     }
     break;
   }
