@@ -504,8 +504,9 @@ void turnOffAllRings()
 }
 
 // Show the number of tries remaining for the current game
-void showTriesRemaining(int triesRemaining) {
-  int y = 220; // Just below the "Last try" line (which is at y=150)
+void showTriesRemaining(int triesRemaining)
+{
+  int y = 220;                                     // Just below the "Last try" line (which is at y=150)
   display.fillRect(0, y, SCREEN_WIDTH, 30, WHITE); // Clear previous message
   display.setTextColor(DARKGREY);
   display.setTextSize(2);
@@ -514,6 +515,61 @@ void showTriesRemaining(int triesRemaining) {
   display.print(" tries remaining");
 }
 
+// Show stars on the display
+void showStarsAndScore(int stars)
+{
+  int yStars = 230; // Adjust as needed, below tries remaining
+  int yScore = yStars + 30;
+
+  // Draw stars
+  display.setTextSize(2);
+  display.setTextColor(GREEN); // Or any color you like
+  display.setCursor(20, yStars);
+  for (int i = 0; i < stars; i++)
+  {
+    display.print("* ");
+  }
+
+  // Draw score
+  display.setTextColor(BLACK);
+  display.setCursor(20, yScore);
+  display.print("Score: ");
+  display.print(stars * 2);
+}
+
+// Show stars and score centered on the display
+void showCenteredStarsAndScore(int stars)
+{
+  display.fillScreen(WHITE); // Clear everything
+
+  // Prepare stars string
+  String starsStr = "";
+  for (int i = 0; i < stars; i++)
+  {
+    starsStr += "* ";
+  }
+
+  // Center stars
+  display.setTextSize(3);
+  display.setTextColor(GREEN);
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(starsStr.c_str(), 0, 0, &x1, &y1, &w, &h);
+  int starsX = (SCREEN_WIDTH - w) / 2;
+  int starsY = (SCREEN_HEIGHT / 2) - 40;
+  display.setCursor(starsX, starsY);
+  display.print(starsStr);
+
+  // Center score
+  String scoreStr = "Score: " + String(stars * 2);
+  display.setTextSize(2);
+  display.setTextColor(BLACK);
+  display.getTextBounds(scoreStr.c_str(), 0, 0, &x1, &y1, &w, &h);
+  int scoreX = (SCREEN_WIDTH - w) / 2;
+  int scoreY = starsY + 50;
+  display.setCursor(scoreX, scoreY);
+  display.print(scoreStr);
+}
 
 void setup()
 {
@@ -680,9 +736,13 @@ void loop()
           currentStep++;
           if (currentStep == colorSequenceLength)
           {
-            Serial.println("Success");
-            showVisualMemoryResult(true);
-            visualMemoryWrongTries = 0; // Reset on win
+            int stars = maxWrongTries - visualMemoryWrongTries;
+            showCenteredStarsAndScore(stars); // Show only stars and score, centered
+            delay(2000);                      // Show for 2 seconds
+            showMenu();                       // Return to games menu
+            currentState = MENU;
+            visualMemoryWrongTries = 0; // Reset tries
+            break;
           }
         }
         else
@@ -739,7 +799,6 @@ void loop()
         codeBreakerWrongTries = 0;
         visualMemoryWrongTries = 0;
         inputIndex = 0;
-        // showInputProgress(inputBuffer, inputIndex);
         int y = 190;
         display.fillRect(0, y, SCREEN_WIDTH, 30, WHITE);
         break;
@@ -760,16 +819,18 @@ void loop()
       if (inputIndex == 3)
       {
         inputBuffer[3] = '\0';
-
         if (strcmp(inputBuffer, randomNumberStr) == 0)
         {
-          showCodeBreakerResult(3, 0);
-          showGeneratingNew();
-          Serial.println("You won!");
-          delay(1500);
-          generateNewRandomNumber();
-          codeBreakerWrongTries = 0; // Reset on win the number of tries
+          int stars = maxWrongTries - codeBreakerWrongTries;
+          showCenteredStarsAndScore(stars); // Show only stars and score, centered
+          delay(2000);                      // Show for 2 seconds
+          showMenu();                       // Return to games menu
+          currentState = MENU;
+          codeBreakerWrongTries = 0; // Reset tries
+          inputIndex = 0;
+          break;
         }
+
         else
         {
           int exact = 0, partial = 0;
