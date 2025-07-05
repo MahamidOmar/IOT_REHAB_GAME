@@ -248,16 +248,6 @@ void showInputProgress(const char *inputBuffer, byte inputIndex)
   }
 }
 
-void showGeneratingNew()
-{
-  int y = 150;
-  display.fillRect(0, y, SCREEN_WIDTH, 30, WHITE);
-  display.setTextColor(GREEN);
-  display.setTextSize(2);
-  display.setCursor(20, y);
-  display.print("Generating new...");
-}
-
 void countMatches(const char *guess, const char *answer, int &exact, int &partial)
 {
   exact = 0;
@@ -312,62 +302,6 @@ void showColorOnDisplay(uint8_t colorIndex)
   display.setTextColor(WHITE);
   display.setCursor(60, 140);
   display.print(colorNames[colorIndex]);
-}
-
-void showVisualMemoryResult(bool correct)
-{
-  display.fillScreen(WHITE);
-  display.setTextSize(2);
-  if (correct)
-  {
-    display.setTextColor(GREEN);
-    display.setCursor(40, 120);
-    display.print("Correct!");
-  }
-  else
-  {
-    display.setTextColor(RED);
-    display.setCursor(40, 120);
-    display.print("Wrong!");
-  }
-  showBottomHints();
-  delay(2000);
-  showMenu();
-  currentState = MENU;
-}
-
-// Show the color on the NeoPixel LEDs
-void showColorOnLEDs(uint8_t colorIndex)
-{
-  // Turn off all LEDs first
-  for (uint8_t i = 0; i < WS2812_NUM_LEDS; i++)
-  {
-    leds.setPixelColor(i, 0); // Off
-  }
-  // Light the corresponding LED
-  if (colorIndex == 0)
-  { // Red
-    leds.setPixelColor(0, leds.Color(255, 0, 0));
-  }
-  else if (colorIndex == 1)
-  { // Blue
-    leds.setPixelColor(1, leds.Color(0, 0, 255));
-  }
-  else if (colorIndex == 2)
-  { // Green
-    leds.setPixelColor(2, leds.Color(0, 255, 0));
-  }
-  leds.show();
-}
-
-// Turn off all LEDs
-void turnOffAllLEDs()
-{
-  for (uint8_t i = 0; i < WS2812_NUM_LEDS; i++)
-  {
-    leds.setPixelColor(i, 0);
-  }
-  leds.show();
 }
 
 // Fetch and parse player names from Firestore
@@ -515,28 +449,6 @@ void showTriesRemaining(int triesRemaining)
   display.print(" tries remaining");
 }
 
-// Show stars on the display
-void showStarsAndScore(int stars)
-{
-  int yStars = 230; // Adjust as needed, below tries remaining
-  int yScore = yStars + 30;
-
-  // Draw stars
-  display.setTextSize(2);
-  display.setTextColor(GREEN); // Or any color you like
-  display.setCursor(20, yStars);
-  for (int i = 0; i < stars; i++)
-  {
-    display.print("* ");
-  }
-
-  // Draw score
-  display.setTextColor(BLACK);
-  display.setCursor(20, yScore);
-  display.print("Score: ");
-  display.print(stars * 2);
-}
-
 // Show stars and score centered on the display
 void showCenteredStarsAndScore(int stars)
 {
@@ -670,17 +582,14 @@ void loop()
         for (uint8_t i = 0; i < colorSequenceLength; i++)
         {
           showColorOnDisplay(colorSequence[i]);
-          // showColorOnLEDs(colorSequence[i]); // <-- Add this line
           showColorOnRings(colorSequence[i]); // Show color on rings
           delay(2000);
-          // turnOffAllLEDs(); // Turn off all LEDs after showing
           turnOffAllRings(); // Turn off all rings after showing
           if (i < colorSequenceLength - 1)
           {
             display.fillScreen(WHITE);
             delay(1000);
           }
-          // turnOffAllLEDs(); // Turn off all LEDs after showing
           turnOffAllRings(); // Turn off all rings after showing
         }
         display.fillScreen(WHITE);
