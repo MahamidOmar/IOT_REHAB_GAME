@@ -34,6 +34,16 @@ Adafruit_NeoPixel leds(WS2812_NUM_LEDS, WS2812_PIN, NEO_GRB + NEO_KHZ800);
 const char *colorNames[] = {"Red", "Blue", "Green"};
 uint16_t colorValues[] = {RED, BLUE, GREEN}; // TFT color values
 
+// --- Color-Word Challenge definitions ---
+#define COLOR_WORD_CHALLENGE_LENGTH 5
+uint8_t cwcSeq1[COLOR_WORD_CHALLENGE_LENGTH];
+uint8_t cwcSeq2[COLOR_WORD_CHALLENGE_LENGTH];
+
+// --- Color-Word Challenge game variables ---
+int colorWordWrongTries = 0;
+uint8_t colorWordCurrentStep = 0;
+const int colorWordMaxTries = 5; // same as sequence length
+
 // Keypad definitions
 const byte ROWS = 4;
 const byte COLS = 3;
@@ -71,7 +81,9 @@ enum State
   CODE_BREAKER,
   VISUAL_MEMORY,
   VISUAL_MEMORY_INPUT,
-  VISUAL_MEMORY_RESULT
+  VISUAL_MEMORY_RESULT,
+  COLOR_WORD_CHALLENGE, // <-- Added new state for the new game
+  COLOR_WORD_CHALLENGE_INPUT
 };
 State currentState = PLAYER_SELECT;
 
@@ -96,6 +108,35 @@ int playerCount = MAX_PLAYERS;
 int codeBreakerWrongTries = 0;
 int visualMemoryWrongTries = 0;
 const int maxWrongTries = 5;
+
+// --- Color-Word Challenge helpers ---
+void generateColorWordChallengeSequences(uint8_t seq1[], uint8_t seq2[], uint8_t length)
+{
+  for (uint8_t i = 0; i < length; i++)
+  {
+    seq1[i] = random(0, 3);
+    uint8_t color2;
+    do
+    {
+      color2 = random(0, 3);
+    } while (color2 == seq1[i]);
+    seq2[i] = color2;
+  }
+}
+
+void showColorWordChallengeStep(uint8_t index)
+{
+  display.fillScreen(WHITE);
+  display.setTextSize(3);
+  display.setTextColor(colorValues[cwcSeq2[index]]);
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(colorNames[cwcSeq1[index]], 0, 0, &x1, &y1, &w, &h);
+  int x = (SCREEN_WIDTH - w) / 2;
+  int y = (SCREEN_HEIGHT - 3 * 8) / 2;
+  display.setCursor(x, y);
+  display.print(colorNames[cwcSeq1[index]]);
+}
 
 // --- Display helpers ---
 void showBottomHints()
@@ -147,6 +188,9 @@ void showMenu()
   y += 30;
   display.setCursor(20, y);
   display.print("2) Visual memory");
+  y += 30;
+  display.setCursor(20, y);
+  display.print("3) Color Word");
   showBottomHints();
 }
 
@@ -602,9 +646,28 @@ void loop()
         lastButtonState[0] = lastButtonState[1] = lastButtonState[2] = HIGH;
         currentState = VISUAL_MEMORY_INPUT;
       }
+      // --- Color-Word Challenge menu handler ---
+      else if (key == '3')
+      {
+        // Generate the two random color sequences for the challenge
+        generateColorWordChallengeSequences(cwcSeq1, cwcSeq2, COLOR_WORD_CHALLENGE_LENGTH);
+        display.fillScreen(WHITE);
+        display.setTextColor(BLACK);
+        display.setTextSize(2);
+        display.setCursor(20, 100);
+        display.print("Color Word");
+        showBottomHints();
+        delay(1000);
+        currentStep = 0;
+        colorWordCurrentStep = 0;
+        colorWordWrongTries = 0;
+        // Show the first challenge step
+        showColorWordChallengeStep(currentStep);
+        currentState = COLOR_WORD_CHALLENGE;
+      }
       else
       {
-        showMenuMessage("Please choose 1 or 2");
+        showMenuMessage("Please choose 1, 2 or 3");
       }
     }
     break;
@@ -691,6 +754,74 @@ void loop()
           showBottomHints();
           showTriesRemaining(maxWrongTries - visualMemoryWrongTries);
           currentStep = 0;
+        }
+      }
+      lastButtonState[i] = reading;
+    }
+    break;
+  }
+
+    // --- Color-Word Challenge state handler (just shows the first step for now) ---
+  case COLOR_WORD_CHALLENGE:
+  {
+    // Allow menu/logout
+    if (key == '*')
+    {
+      showMenu();
+      currentState = MENU;
+      colorWordWrongTries = 0;
+      break;
+    }
+    if (key == '#')
+    {
+      showPlayerMenu();
+      currentState = PLAYER_SELECT;
+      colorWordWrongTries = 0;
+      break;
+    }
+
+    // Button input handling
+    int buttonPins[3] = {RED_BUTTON_PIN, BLUE_BUTTON_PIN, GREEN_BUTTON_PIN};
+    for (int i = 0; i < 3; i++)
+    {
+      int reading = digitalRead(buttonPins[i]);
+      if (lastButtonState[i] == HIGH && reading == LOW && (millis() - lastDebounceTime[i]) > debounceDelay)
+      {
+        lastDebounceTime[i] = millis();
+        // The correct answer is the color in cwcSeq1[colorWordCurrentStep]
+        if (i == cwcSeq1[colorWordCurrentStep])
+        {
+          // Correct!
+          colorWordCurrentStep++;
+          if (colorWordCurrentStep == COLOR_WORD_CHALLENGE_LENGTH)
+          {
+            // Game complete, show stars/score
+            int stars = colorWordMaxTries - colorWordWrongTries;
+            showCenteredStarsAndScore(stars);
+            delay(2000);
+            showMenu();
+            currentState = MENU;
+            colorWordWrongTries = 0;
+            colorWordCurrentStep = 0;
+            break;
+          }
+          else
+          {
+            showColorWordChallengeStep(colorWordCurrentStep);
+          }
+        }
+        else
+        {
+          // Wrong!
+          colorWordWrongTries++;
+          // Optional: flash screen/message for wrong answer
+          display.fillScreen(WHITE);
+          display.setTextSize(2);
+          display.setTextColor(RED);
+          display.setCursor(40, 120);
+          display.print("Wrong!");
+          delay(1000);
+          showColorWordChallengeStep(colorWordCurrentStep);
         }
       }
       lastButtonState[i] = reading;
