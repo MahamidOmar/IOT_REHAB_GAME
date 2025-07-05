@@ -503,6 +503,18 @@ void turnOffAllRings()
   leds.show();
 }
 
+// Show the number of tries remaining for the current game
+void showTriesRemaining(int triesRemaining) {
+  int y = 220; // Just below the "Last try" line (which is at y=150)
+  display.fillRect(0, y, SCREEN_WIDTH, 30, WHITE); // Clear previous message
+  display.setTextColor(DARKGREY);
+  display.setTextSize(2);
+  display.setCursor(20, y);
+  display.print(triesRemaining);
+  display.print(" tries remaining");
+}
+
+
 void setup()
 {
   // Initialize NeoPixel LEDs
@@ -637,6 +649,7 @@ void loop()
     // --- Handle keypad keys for menu/logout ---
     if (key == '*')
     {
+      display.fillRect(0, 220, SCREEN_WIDTH, 30, WHITE);
       showMenu();
       currentState = MENU;
       codeBreakerWrongTries = 0;
@@ -684,6 +697,7 @@ void loop()
             display.setCursor(20, 120);
             display.print("Out of tries!");
             delay(2000);
+            display.fillRect(0, 220, SCREEN_WIDTH, 30, WHITE);
             showMenu();
             currentState = MENU;
             visualMemoryWrongTries = 0; // Reset for next game
@@ -706,6 +720,7 @@ void loop()
           display.setCursor(20, 100);
           display.print("Repeat the sequence!");
           showBottomHints();
+          showTriesRemaining(maxWrongTries - visualMemoryWrongTries);
           currentStep = 0;
         }
       }
@@ -762,6 +777,7 @@ void loop()
 
           showCodeBreakerResult(exact, partial);
           showLastTry(inputBuffer);
+          showTriesRemaining(maxWrongTries - codeBreakerWrongTries - 1);
 
           codeBreakerWrongTries++; // Increment on wrong try
 
