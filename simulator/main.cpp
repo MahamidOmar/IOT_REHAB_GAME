@@ -203,7 +203,7 @@ void showCodeBreakerResult(int exact, int partial)
   display.setCursor(20, y);
   display.print("Exact: ");
   display.print(exact);
-  display.setTextColor(YELLOW);
+  display.setTextColor(RED);
   display.setCursor(20, y + 30);
   display.print("Partial: ");
   display.print(partial);
@@ -589,7 +589,7 @@ void loop()
       else if (key == '2')
       { // Visual Memory
         display.fillScreen(WHITE);
-        display.setTextColor(BLUE);
+        display.setTextColor(BLACK);
         display.setTextSize(2);
         display.setCursor(20, 100);
         display.print("Visual memory game");
