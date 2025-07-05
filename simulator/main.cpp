@@ -46,10 +46,13 @@ const int colorWordMaxTries = 5; // same as sequence length
 
 // --- Led Reaction game variables ---
 unsigned long ledReactionStartTime = 0;
-const unsigned long ledReactionGameDuration = 30000; // 30 seconds in ms
+const unsigned long ledReactionGameDuration = 20000; // 20 seconds in ms
 int ledReactionCorrect = 0;
-int ledReactionCurrentColor = 0; // 0=Red, 1=Blue, 2=Green
+int ledReactionCurrentColor = 0;
 bool ledReactionActive = false;
+bool ledReactionWaiting = false; // Are we in the 1s delay between rounds?
+unsigned long ledReactionDelayStart = 0;
+const unsigned long ledReactionDelayDuration = 1000; // 1 second between rounds
 
 // Keypad definitions
 const byte ROWS = 4;
@@ -600,6 +603,22 @@ void showLedReactionColor(int colorIdx)
   showColorOnRings(colorIdx);
 }
 
+// Function to determine the number of stars based on coins
+int ledReactionStars(int coins)
+{
+  if (coins >= 14)
+    return 5;
+  if (coins >= 10)
+    return 4;
+  if (coins >= 7)
+    return 3;
+  if (coins >= 4)
+    return 2;
+  if (coins >= 1)
+    return 1;
+  return 0;
+}
+
 void setup()
 {
   // Initialize NeoPixel LEDs
@@ -738,9 +757,11 @@ void loop()
         ledReactionActive = true;
         ledReactionStartTime = millis();
         ledReactionCurrentColor = random(0, 3);
+        ledReactionWaiting = false;
         showLedReactionColor(ledReactionCurrentColor);
         currentState = LED_REACTION;
       }
+
       else
       {
         showMenuMessage("Please choose 1, 2, 3 or 4");
@@ -907,28 +928,46 @@ void loop()
 
   case LED_REACTION:
   {
+    unsigned long now = millis();
+
     // End game if time is up
-    if (ledReactionActive && (millis() - ledReactionStartTime >= ledReactionGameDuration))
+    if (ledReactionActive && (now - ledReactionStartTime >= ledReactionGameDuration))
     {
       ledReactionActive = false;
       turnOffAllRings();
       display.fillScreen(WHITE);
       display.setTextSize(2);
       display.setTextColor(BLACK);
-      const char *msg = "Correct guesses:";
+
+      // Show coins
+      const char *msg = "Coins:";
       int16_t x1, y1;
       uint16_t w, h;
       display.getTextBounds(msg, 0, 0, &x1, &y1, &w, &h);
       int x = (SCREEN_WIDTH - w) / 2;
-      int y = 120;
+      int y = 80;
       display.setCursor(x, y);
       display.print(msg);
-      String scoreStr = String(ledReactionCorrect);
-      display.getTextBounds(scoreStr.c_str(), 0, 0, &x1, &y1, &w, &h);
+      String coinsStr = String(ledReactionCorrect);
+      display.getTextBounds(coinsStr.c_str(), 0, 0, &x1, &y1, &w, &h);
       x = (SCREEN_WIDTH - w) / 2;
-      y += 40;
+      y += 30;
       display.setCursor(x, y);
-      display.print(scoreStr);
+      display.print(coinsStr);
+
+      // Show stars
+      int stars = ledReactionStars(ledReactionCorrect);
+      String starsStr = "Stars: ";
+      for (int i = 0; i < stars; i++)
+        starsStr += "* ";
+      display.setTextSize(2);
+      display.setTextColor(GREEN);
+      display.getTextBounds(starsStr.c_str(), 0, 0, &x1, &y1, &w, &h);
+      x = (SCREEN_WIDTH - w) / 2;
+      y += 50;
+      display.setCursor(x, y);
+      display.print(starsStr);
+
       delay(2500);
       showMenu();
       currentState = MENU;
@@ -953,29 +992,44 @@ void loop()
       break;
     }
 
-    // Button input handling (only if game is active)
+    // If waiting between rounds, check if 1s has passed
+    if (ledReactionWaiting)
+    {
+      if (now - ledReactionDelayStart >= ledReactionDelayDuration)
+      {
+        // Generate and show new color
+        int newColor;
+        do
+        {
+          newColor = random(0, 3);
+        } while (newColor == ledReactionCurrentColor);
+        ledReactionCurrentColor = newColor;
+        showLedReactionColor(ledReactionCurrentColor);
+        ledReactionWaiting = false;
+      }
+      break; // Don't process button input during the delay
+    }
+
+    // Button input handling (only if game is active and not waiting)
     if (ledReactionActive)
     {
       int buttonPins[3] = {RED_BUTTON_PIN, BLUE_BUTTON_PIN, GREEN_BUTTON_PIN};
       for (int i = 0; i < 3; i++)
       {
         int reading = digitalRead(buttonPins[i]);
-        if (lastButtonState[i] == HIGH && reading == LOW && (millis() - lastDebounceTime[i]) > debounceDelay)
+        if (lastButtonState[i] == HIGH && reading == LOW && (now - lastDebounceTime[i]) > debounceDelay)
         {
-          lastDebounceTime[i] = millis();
+          lastDebounceTime[i] = now;
           // Check if correct
           if (i == ledReactionCurrentColor)
           {
             ledReactionCorrect++;
           }
-          // Generate and show new color
-          int newColor;
-          do
-          {
-            newColor = random(0, 3);
-          } while (newColor == ledReactionCurrentColor); // Avoid same color twice in a row
-          ledReactionCurrentColor = newColor;
-          showLedReactionColor(ledReactionCurrentColor);
+          // Start the 1s delay before next color
+          ledReactionWaiting = true;
+          ledReactionDelayStart = now;
+          turnOffAllRings();
+          display.fillScreen(WHITE); // Optionally blank the screen during the wait
         }
         lastButtonState[i] = reading;
       }
