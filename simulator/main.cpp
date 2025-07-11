@@ -54,6 +54,10 @@ bool ledReactionWaiting = false; // Are we in the 1s delay between rounds?
 unsigned long ledReactionDelayStart = 0;
 const unsigned long ledReactionDelayDuration = 1000; // 1 second between rounds
 
+// Multiplayer game variables
+byte multiplayerPlayer1 = 0; // 1-based index
+byte multiplayerPlayer2 = 0; // 1-based index
+
 // Keypad definitions
 const byte ROWS = 4;
 const byte COLS = 3;
@@ -86,7 +90,11 @@ int lastButtonState[3] = {HIGH, HIGH, HIGH};
 
 enum State
 {
+  MODE_SELECT,
+  PLAYER1_SELECT,
+  PLAYER2_SELECT,
   PLAYER_SELECT,
+  MULTI_MENU,
   MENU,
   CODE_BREAKER,
   VISUAL_MEMORY,
@@ -165,6 +173,57 @@ void showBottomHints()
   display.print(logoutText);
 }
 
+// Show the mode selection screen
+void showModeSelect()
+{
+  display.fillScreen(WHITE);
+  display.setTextColor(BLACK);
+  display.setTextSize(2);
+  display.setCursor(20, 80);
+  display.print("Choose your mode:");
+  display.setCursor(20, 130);
+  display.print("1) Single player");
+  display.setCursor(20, 170);
+  display.print("2) Multiplayer");
+}
+
+// Show the multiplayer player selection screen, first for player 1 then for player 2
+void showMultiplayerPlayerSelect1()
+{
+  display.fillScreen(WHITE);
+  display.setTextColor(BLACK);
+  display.setTextSize(2);
+  display.setCursor(20, 60);
+  display.print("Choose Player 1:");
+  int y = 100;
+  for (int i = 0; i < playerCount; i++)
+  {
+    display.setCursor(20, y);
+    display.print(String(i + 1) + ") " + playerNames[i]);
+    y += 30;
+  }
+}
+
+void showMultiplayerPlayerSelect2(byte excludeIndex)
+{
+  display.fillScreen(WHITE);
+  display.setTextColor(BLACK);
+  display.setTextSize(2);
+  display.setCursor(20, 60);
+  display.print("Choose Player 2:");
+  int y = 100;
+  int optionNum = 1;
+  for (int i = 0; i < playerCount; i++)
+  {
+    if (i == excludeIndex)
+      continue; // skip the chosen player
+    display.setCursor(20, y);
+    display.print(String(optionNum) + ") " + playerNames[i]);
+    y += 30;
+    optionNum++;
+  }
+}
+
 void showPlayerSelected(byte player)
 {
   display.fillScreen(WHITE);
@@ -185,6 +244,7 @@ void showPlayerSelected(byte player)
   delay(1200);
 }
 
+// Show single player games menu
 void showMenu()
 {
   display.fillScreen(WHITE);
@@ -206,6 +266,19 @@ void showMenu()
   display.setCursor(20, y);
   display.print("4) Led Reaction");
   showBottomHints();
+}
+
+// Show multiplayer games menu
+void showMultiplayerMenu()
+{
+  display.fillScreen(WHITE);
+  display.setTextColor(BLACK);
+  display.setTextSize(2);
+  display.setCursor(20, 60);
+  display.print("Multiplayer Games:");
+  int y = 110;
+  display.setCursor(20, y);
+  display.print("1) Code Breaker");
 }
 
 void showMenuMessage(const char *msg)
@@ -632,6 +705,7 @@ void setup()
 
   // Show loading screen while connecting to Wi-Fi
   showLoadingScreen();
+  showModeSelect();
 
   // Connect to Wi-Fi (WPA2-Enterprise)
   /*
@@ -654,9 +728,8 @@ void setup()
   // fetchPlayersFromFirestore();
   // showLoadingScreen();
 
-  showPlayerMenu();
-
-  currentState = PLAYER_SELECT;
+  // currentState = PLAYER_SELECT;
+  currentState = MODE_SELECT;
 
   pinMode(RED_BUTTON_PIN, INPUT_PULLUP);
   pinMode(BLUE_BUTTON_PIN, INPUT_PULLUP);
@@ -668,6 +741,87 @@ void loop()
   char key = keypad.getKey();
   switch (currentState)
   {
+  case MODE_SELECT:
+    if (key == '1')
+    {
+      showPlayerMenu();
+      currentState = PLAYER_SELECT;
+      delay(150);
+      while (keypad.getKey() != NO_KEY)
+      {
+      }
+    }
+    else if (key == '2')
+    {
+      showMultiplayerPlayerSelect1();
+      currentState = PLAYER1_SELECT;
+      delay(150);
+      while (keypad.getKey() != NO_KEY)
+      {
+      }
+    }
+    break;
+
+  case PLAYER1_SELECT:
+    if (key && key >= '1' && key <= '0' + playerCount)
+    {
+      multiplayerPlayer1 = key - '0';                       // 1-based index
+      showMultiplayerPlayerSelect2(multiplayerPlayer1 - 1); // Pass 0-based index to exclude
+      currentState = PLAYER2_SELECT;
+      delay(150);
+      while (keypad.getKey() != NO_KEY)
+      {
+      }
+    }
+    break;
+
+  case PLAYER2_SELECT:
+    if (key && key >= '1' && key <= '0' + (playerCount - 1))
+    {
+      // Map the key to the correct player index, skipping the excluded one
+      int option = key - '1';               // 0-based option
+      int exclude = multiplayerPlayer1 - 1; // 0-based index to skip
+      int chosenIdx = -1;
+      int count = 0;
+      for (int i = 0; i < playerCount; i++)
+      {
+        if (i == exclude)
+          continue;
+        if (count == option)
+        {
+          chosenIdx = i;
+          break;
+        }
+        count++;
+      }
+      if (chosenIdx != -1)
+      {
+        multiplayerPlayer2 = chosenIdx + 1; // Store as 1-based
+        showMultiplayerMenu();
+        currentState = MULTI_MENU;
+        delay(150);
+        while (keypad.getKey() != NO_KEY)
+        {
+        }
+      }
+    }
+    break;
+
+  case MULTI_MENU:
+    if (key == '1')
+    {
+      display.fillScreen(WHITE);
+      display.setTextColor(RED);
+      display.setTextSize(2);
+      display.setCursor(20, 120);
+      display.print("Not implemented");
+      delay(1500);
+      showMultiplayerMenu();
+      // Remain in MULTI_MENU
+    }
+    // Optionally, handle '*' or '#' to go back to mode select or player select
+    break;
+
   case PLAYER_SELECT:
     if (key && key >= '1' && key <= '4' && key - '0' <= playerCount)
     {
