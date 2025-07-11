@@ -177,14 +177,68 @@ void showBottomHints()
 void showModeSelect()
 {
   display.fillScreen(WHITE);
+
+  // --- Title ---
   display.setTextColor(BLACK);
-  display.setTextSize(2);
-  display.setCursor(20, 80);
-  display.print("Choose your mode:");
-  display.setCursor(20, 130);
-  display.print("1) Single player");
-  display.setCursor(20, 170);
-  display.print("2) Multiplayer");
+  display.setTextSize(2); // Keep the title moderate
+  const char *title = "Choose your mode";
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(title, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor((SCREEN_WIDTH - w) / 2, 24);
+  display.print(title);
+
+  // --- Button dimensions ---
+  int btnWidth = 180;
+  int btnHeight = 48;
+  int btnX = (SCREEN_WIDTH - btnWidth) / 2;
+  int btnY1 = 70;
+  int btnY2 = 140;
+  int radius = 14;
+
+  // --- Single Player Button (Blue) ---
+  uint16_t singleColor = 0x3A99; // Soft blue
+  display.fillRoundRect(btnX, btnY1, btnWidth, btnHeight, radius, singleColor);
+  display.drawRoundRect(btnX, btnY1, btnWidth, btnHeight, radius, 0x001F); // Blue border
+
+  // Single player icon (head and shoulders)
+  int iconX = btnX + 28;
+  int iconY = btnY1 + btnHeight / 2 - 4;
+  display.fillCircle(iconX, iconY, 10, WHITE);                     // Head
+  display.fillRoundRect(iconX - 10, iconY + 10, 20, 10, 5, WHITE); // Shoulders/body
+
+  // Label (smaller font)
+  display.setTextSize(1); // Make label smaller
+  display.setTextColor(WHITE);
+  display.setCursor(btnX + 55, btnY1 + btnHeight / 2 - 6);
+  display.print("Single Player");
+
+  // --- Multiplayer Button (Green) ---
+  uint16_t multiColor = 0x07E0; // Green
+  display.fillRoundRect(btnX, btnY2, btnWidth, btnHeight, radius, multiColor);
+  display.drawRoundRect(btnX, btnY2, btnWidth, btnHeight, radius, 0x03E0); // Dark green border
+
+  // Multiplayer icon (two heads)
+  int iconX1 = btnX + 23, iconY1 = btnY2 + btnHeight / 2 - 3;
+  int iconX2 = btnX + 38, iconY2 = btnY2 + btnHeight / 2 + 2;
+  display.fillCircle(iconX1, iconY1, 8, WHITE);                   // Head 1
+  display.fillCircle(iconX2, iconY2, 8, WHITE);                   // Head 2
+  display.fillRoundRect(iconX1 - 8, iconY1 + 8, 16, 8, 4, WHITE); // Body 1
+  display.fillRoundRect(iconX2 - 8, iconY2 + 8, 16, 8, 4, WHITE); // Body 2
+
+  // Label (smaller font)
+  display.setTextSize(1); // Make label smaller
+  display.setTextColor(WHITE);
+  display.setCursor(btnX + 55, btnY2 + btnHeight / 2 - 6);
+  display.print("Multiplayer");
+
+  // --- Shortcut hint at bottom ---
+  display.setTextSize(1);
+  display.setTextColor(DARKGREY);
+  const char *hint = "Press 1 for Single, 2 for Multi";
+  display.getTextBounds(hint, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor((SCREEN_WIDTH - w) / 2, SCREEN_HEIGHT - 18);
+  display.print(hint);
 }
 
 // Show the multiplayer player selection screen, first for player 1 then for player 2
@@ -521,6 +575,16 @@ void showPlayerMenu()
     display.print(String(i + 1) + ") " + playerNames[i]);
     y += 30;
   }
+
+  // --- Add this for # logout at bottom right ---
+  const char *logoutText = "# logout";
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.setTextSize(1);
+  display.setTextColor(DARKGREY);
+  display.getTextBounds(logoutText, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor(SCREEN_WIDTH - w, SCREEN_HEIGHT - 10);
+  display.print(logoutText);
 }
 
 // Show loading screen with a circle and "loading" text
@@ -742,6 +806,7 @@ void loop()
   switch (currentState)
   {
   case MODE_SELECT:
+  {
     if (key == '1')
     {
       showPlayerMenu();
@@ -761,8 +826,18 @@ void loop()
       }
     }
     break;
+  }
 
   case PLAYER1_SELECT:
+  {
+    if (key == '#')
+    {
+      showModeSelect();
+      currentState = MODE_SELECT;
+      // Optionally reset other variables here if needed
+      return; // or break; if not in a function
+    }
+
     if (key && key >= '1' && key <= '0' + playerCount)
     {
       multiplayerPlayer1 = key - '0';                       // 1-based index
@@ -774,8 +849,18 @@ void loop()
       }
     }
     break;
+  }
 
   case PLAYER2_SELECT:
+  {
+    if (key == '#')
+    {
+      showModeSelect();
+      currentState = MODE_SELECT;
+      // Optionally reset other variables here if needed
+      return; // or break; if not in a function
+    }
+
     if (key && key >= '1' && key <= '0' + (playerCount - 1))
     {
       // Map the key to the correct player index, skipping the excluded one
@@ -806,8 +891,18 @@ void loop()
       }
     }
     break;
+  }
 
   case MULTI_MENU:
+  {
+    if (key == '#')
+    {
+      showModeSelect();
+      currentState = MODE_SELECT;
+      // Optionally reset other variables here if needed
+      return; // or break; if not in a function
+    }
+
     if (key == '1')
     {
       display.fillScreen(WHITE);
@@ -821,8 +916,18 @@ void loop()
     }
     // Optionally, handle '*' or '#' to go back to mode select or player select
     break;
+  }
 
   case PLAYER_SELECT:
+  {
+    if (key == '#')
+    {
+      showModeSelect();
+      currentState = MODE_SELECT;
+      // Optionally reset other variables here if needed
+      return; // or break; if not in a function
+    }
+
     if (key && key >= '1' && key <= '4' && key - '0' <= playerCount)
     {
       currentPlayer = key - '0';
@@ -831,14 +936,16 @@ void loop()
       currentState = MENU;
     }
     break;
+  }
 
   case MENU:
+  {
     if (key)
     {
       if (key == '#')
       {
-        showPlayerMenu();
-        currentState = PLAYER_SELECT;
+        showModeSelect();
+        currentState = MODE_SELECT;
         codeBreakerWrongTries = 0;
         visualMemoryWrongTries = 0;
         break;
@@ -922,10 +1029,10 @@ void loop()
       }
     }
     break;
+  }
 
   case VISUAL_MEMORY_INPUT:
   {
-    // --- Handle keypad keys for menu/logout ---
     if (key == '*')
     {
       display.fillRect(0, 220, SCREEN_WIDTH, 30, WHITE);
@@ -937,8 +1044,8 @@ void loop()
     }
     if (key == '#')
     {
-      showPlayerMenu();
-      currentState = PLAYER_SELECT;
+      showModeSelect();
+      currentState = MODE_SELECT;
       codeBreakerWrongTries = 0;
       visualMemoryWrongTries = 0;
       break;
@@ -1025,8 +1132,8 @@ void loop()
     }
     if (key == '#')
     {
-      showPlayerMenu();
-      currentState = PLAYER_SELECT;
+      showModeSelect();
+      currentState = MODE_SELECT;
       colorWordWrongTries = 0;
       break;
     }
@@ -1140,8 +1247,8 @@ void loop()
     if (key == '#')
     {
       turnOffAllRings();
-      showPlayerMenu();
-      currentState = PLAYER_SELECT;
+      showModeSelect();
+      currentState = MODE_SELECT;
       ledReactionActive = false;
       break;
     }
@@ -1192,6 +1299,7 @@ void loop()
   }
 
   case CODE_BREAKER:
+  {
     if (key)
     {
       if (key == '*')
@@ -1207,8 +1315,8 @@ void loop()
       }
       if (key == '#')
       {
-        showPlayerMenu();
-        currentState = PLAYER_SELECT;
+        showModeSelect();
+        currentState = MODE_SELECT;
         codeBreakerWrongTries = 0;
         visualMemoryWrongTries = 0;
         break;
@@ -1279,5 +1387,6 @@ void loop()
       }
     }
     break;
+  }
   }
 }
