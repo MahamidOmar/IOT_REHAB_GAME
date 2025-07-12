@@ -7,6 +7,14 @@
 #include "esp_wpa2.h" // Only needed for WPA2-Enterprise
 
 unsigned long colorWordStepStartTime = 0;
+enum CodeBreakerDifficulty
+{
+  CB_EASY,
+  CB_MEDIUM,
+  CB_HARD
+};
+CodeBreakerDifficulty codeBreakerDifficulty = CB_EASY; // Default
+int codeBreakerMaxTries = 12;
 enum LedReactionDifficulty
 {
   LED_EASY,
@@ -161,6 +169,8 @@ enum State
   CODE_BREAKER,
   COLOR_WORD_DIFFICULTY_SELECT,
   COLOR_WORD_CHALLENGE,
+  CODE_BREAKER_DIFFICULTY_SELECT, // For single player Code Breaker difficulty menu
+  VISUAL_MEMORY_DIFFICULTY_SELECT,
   VISUAL_MEMORY,
   VISUAL_MEMORY_INPUT,
   VISUAL_MEMORY_RESULT,
@@ -191,7 +201,8 @@ int playerCount = MAX_PLAYERS;
 // Game variables for number of tries
 int codeBreakerWrongTries = 0;
 int visualMemoryWrongTries = 0;
-const int maxWrongTries = 5;
+int maxWrongTries = 5;
+int maxWrongTries_VM = 3; // For Visual Memory game
 void showLedReactionScore(int score)
 {
   display.fillScreen(WHITE);
@@ -207,7 +218,6 @@ void showLedReactionScore(int score)
   display.print(msg);
   delay(2000); // Show for 2 seconds
 }
-
 void showLedReactionDifficultySelect()
 {
   display.fillScreen(WHITE);
@@ -567,18 +577,6 @@ void showMenuMessage(const char *msg)
   display.print(msg);
 }
 
-void showCodeBreakerTitle()
-{
-  display.fillScreen(WHITE);
-  display.setTextColor(BLACK);
-  display.setTextSize(2);
-  display.setCursor(30, 100);
-  display.print("Code breaker game");
-  delay(2000);
-  display.fillScreen(WHITE);
-  showBottomHints();
-}
-
 void showColorWordTitle()
 {
   display.fillScreen(WHITE);
@@ -647,7 +645,50 @@ void showLastTry(const char *guess)
   display.print("Last try: ");
   display.print(guess);
 }
-
+void showCodeBreakerDifficultyMenu()
+{
+  display.fillScreen(WHITE);
+  display.setTextColor(BLACK);
+  display.setTextSize(2);
+  display.setCursor(20, 60);
+  display.print("Select Difficulty:");
+  display.setCursor(20, 110);
+  display.print("1) Easy (12 tries)");
+  display.setCursor(20, 150);
+  display.print("2) Medium (8 tries)");
+  display.setCursor(20, 190);
+  display.print("3) Hard (5 tries)");
+  showBottomHints();
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void showCodeBreakerTitle()
+{
+  display.fillScreen(WHITE);
+  display.setTextColor(BLACK);
+  display.setTextSize(2);
+  display.setCursor(30, 100);
+  display.print("Code breaker game");
+  delay(2000);
+  display.fillScreen(WHITE);
+  showBottomHints();
+}
+// Show the difficulty selection screen for Visual Memory
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void showVisualMemoryDifficultyMenu()
+{
+  display.fillScreen(WHITE);
+  display.setTextColor(BLACK);
+  display.setTextSize(2);
+  display.setCursor(20, 60);
+  display.print("Select Difficulty:");
+  display.setCursor(20, 110);
+  display.print("1) Easy (5 colors)");
+  display.setCursor(20, 150);
+  display.print("2) Medium (8 colors)");
+  display.setCursor(20, 190);
+  display.print("3) Hard (10 colors)");
+  showBottomHints();
+}
 void showInputProgress(const char *inputBuffer, byte inputIndex)
 {
   int y = 190;
@@ -1450,6 +1491,7 @@ void loop()
   }
 
   case MENU:
+
   {
     if (key)
     {
@@ -1467,48 +1509,34 @@ void loop()
       //  Code Breaker
       if (key == '1')
       {
-        showCodeBreakerTitle();
         generateNewRandomNumber();
         inputIndex = 0;
         codeBreakerWrongTries = 0; // Reset here the number of tries
         showInputProgress(inputBuffer, inputIndex);
-        currentState = CODE_BREAKER;
+        currentState = CODE_BREAKER_DIFFICULTY_SELECT;
+        showCodeBreakerDifficultyMenu();
+        if (key == '*')
+        {
+          display.fillRect(0, 220, SCREEN_WIDTH, 30, WHITE);
+          showMenu();
+          currentState = MENU;
+          codeBreakerWrongTries = 0;
+          visualMemoryWrongTries = 0;
+          break;
+        }
+        if (key == '#')
+        {
+          showModeSelect();
+          currentState = MODE_SELECT;
+          codeBreakerWrongTries = 0;
+          visualMemoryWrongTries = 0;
+          break;
+        }
       }
       else if (key == '2')
-      { // Visual Memory
-        display.fillScreen(WHITE);
-        display.setTextColor(BLACK);
-        display.setTextSize(2);
-        display.setCursor(20, 100);
-        display.print("Visual memory game");
-        showBottomHints();
-        delay(1000);
-
-        visualMemoryWrongTries = 0; // Reset here the number of tries
-
-        generateRandomColorSequence(colorSequence, colorSequenceLength);
-        for (uint8_t i = 0; i < colorSequenceLength; i++)
-        {
-          showColorOnDisplay(colorSequence[i]);
-          showColorOnRings(colorSequence[i]); // Show color on rings
-          delay(2000);
-          turnOffAllRings(); // Turn off all rings after showing
-          if (i < colorSequenceLength - 1)
-          {
-            display.fillScreen(WHITE);
-            delay(1000);
-          }
-          turnOffAllRings(); // Turn off all rings after showing
-        }
-        display.fillScreen(WHITE);
-        display.setTextColor(BLACK);
-        display.setTextSize(2);
-        display.setCursor(20, 100);
-        display.print("Repeat the sequence!");
-        showBottomHints();
-        currentStep = 0;
-        lastButtonState[0] = lastButtonState[1] = lastButtonState[2] = HIGH;
-        currentState = VISUAL_MEMORY_INPUT;
+      {
+        currentState = VISUAL_MEMORY_DIFFICULTY_SELECT;
+        showVisualMemoryDifficultyMenu();
       }
       // --- Color-Word Challenge menu handler ---
       else if (key == '3')
@@ -1526,6 +1554,71 @@ void loop()
       {
         showMenuMessage("Please choose 1, 2, 3 or 4");
       }
+    }
+    break;
+  }
+  case VISUAL_MEMORY_DIFFICULTY_SELECT:
+  {
+    if (key)
+    {
+      if (key == '*')
+      {
+        display.fillRect(0, 220, SCREEN_WIDTH, 30, WHITE);
+        showMenu();
+        currentState = MENU;
+        codeBreakerWrongTries = 0;
+        visualMemoryWrongTries = 0;
+        break;
+      }
+      if (key == '#')
+      {
+        showModeSelect();
+        currentState = MODE_SELECT;
+        codeBreakerWrongTries = 0;
+        visualMemoryWrongTries = 0;
+        break;
+      }
+      switch (key)
+      {
+      case '1': // Easy
+        colorSequenceLength = 5;
+        break;
+      case '2': // Medium
+        colorSequenceLength = 8;
+        break;
+      case '3': // Hard
+        colorSequenceLength = 10;
+        break;
+      default:
+        // Ignore other keys
+        return;
+      }
+      visualMemoryWrongTries = 0; // Reset tries
+
+      // Now start the Visual Memory game as before:
+      generateRandomColorSequence(colorSequence, colorSequenceLength);
+      for (uint8_t i = 0; i < colorSequenceLength; i++)
+      {
+        showColorOnDisplay(colorSequence[i]);
+        showColorOnRings(colorSequence[i]);
+        delay(2000);
+        turnOffAllRings();
+        if (i < colorSequenceLength - 1)
+        {
+          display.fillScreen(WHITE);
+          delay(1000);
+        }
+        turnOffAllRings();
+      }
+      display.fillScreen(WHITE);
+      display.setTextColor(BLACK);
+      display.setTextSize(2);
+      display.setCursor(20, 100);
+      display.print("Repeat the sequence!");
+      showBottomHints();
+      currentStep = 0;
+      lastButtonState[0] = lastButtonState[1] = lastButtonState[2] = HIGH;
+      currentState = VISUAL_MEMORY_INPUT;
     }
     break;
   }
@@ -1565,7 +1658,7 @@ void loop()
           currentStep++;
           if (currentStep == colorSequenceLength)
           {
-            int stars = maxWrongTries - visualMemoryWrongTries;
+            int stars = 10 - visualMemoryWrongTries;
             showCenteredStarsAndScore(stars); // Show only stars and score, centered
             delay(2000);                      // Show for 2 seconds
             showMenu();                       // Return to games menu
@@ -1578,7 +1671,7 @@ void loop()
         {
           visualMemoryWrongTries++; // Increment on wrong try
           // Check if the number of wrong tries exceeds the maximum allowed
-          if (visualMemoryWrongTries >= maxWrongTries)
+          if (visualMemoryWrongTries >= maxWrongTries_VM)
           {
             display.fillScreen(WHITE);
             display.setTextColor(RED);
@@ -1609,7 +1702,7 @@ void loop()
           display.setCursor(20, 100);
           display.print("Repeat the sequence!");
           showBottomHints();
-          showTriesRemaining(maxWrongTries - visualMemoryWrongTries);
+          showTriesRemaining(maxWrongTries_VM - visualMemoryWrongTries);
           currentStep = 0;
         }
       }
@@ -1921,6 +2014,61 @@ void loop()
       showMenu();
       currentState = MENU;
       ledReactionWaiting = false;
+    }
+    break;
+  }
+
+  case CODE_BREAKER_DIFFICULTY_SELECT:
+  {
+    if (key)
+    {
+      if (key == '*')
+      {
+        display.fillRect(0, 220, SCREEN_WIDTH, 30, WHITE);
+        showMenu();
+        currentState = MENU;
+        codeBreakerWrongTries = 0;
+        visualMemoryWrongTries = 0;
+        break;
+      }
+      if (key == '#')
+      {
+        showModeSelect();
+        currentState = MODE_SELECT;
+        codeBreakerWrongTries = 0;
+        visualMemoryWrongTries = 0;
+        break;
+      }
+      switch (key)
+      {
+      case '1': // Easy
+        codeBreakerWrongTries = 0;
+        // Set max tries for easy
+        maxWrongTries = 12;
+        currentState = CODE_BREAKER;
+        showCodeBreakerTitle(); // Show the title screen
+        generateNewRandomNumber();
+        break;
+      case '2': // Medium
+        codeBreakerWrongTries = 0;
+        // Set max tries for medium
+        maxWrongTries = 8;
+        currentState = CODE_BREAKER;
+        showCodeBreakerTitle(); // Show the title screen
+        generateNewRandomNumber();
+        break;
+      case '3': // Hard
+        codeBreakerWrongTries = 0;
+        // Set max tries for hard
+        maxWrongTries = 5;
+        currentState = CODE_BREAKER;
+        showCodeBreakerTitle(); // Show the title screen
+        generateNewRandomNumber();
+        break;
+      default:
+        // Ignore other keys
+        break;
+      }
     }
     break;
   }
