@@ -172,6 +172,7 @@ int playerCount = MAX_PLAYERS;
 int codeBreakerWrongTries = 0;
 int visualMemoryWrongTries = 0;
 int maxWrongTries = 5;
+int maxWrongTries_VM = 3;
 
 // --- Color-Word Challenge helpers ---
 void generateColorWordChallengeSequences(uint8_t seq1[], uint8_t seq2[], uint8_t length)
@@ -470,6 +471,7 @@ void showMenuMessage(const char *msg)
 }
 
 // Show the difficulty selection screen for Code Breaker
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void showCodeBreakerDifficultyMenu() {
   display.fillScreen(WHITE);
   display.setTextColor(BLACK);
@@ -484,7 +486,7 @@ void showCodeBreakerDifficultyMenu() {
   display.print("3) Hard (5 tries)");
   showBottomHints();
 }
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void showCodeBreakerTitle()
 {
   display.fillScreen(WHITE);
@@ -497,6 +499,7 @@ void showCodeBreakerTitle()
   showBottomHints();
 }
 // Show the difficulty selection screen for Visual Memory
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void showVisualMemoryDifficultyMenu() {
   display.fillScreen(WHITE);
   display.setTextColor(BLACK);
@@ -511,7 +514,7 @@ void showVisualMemoryDifficultyMenu() {
   display.print("3) Hard (10 colors)");
   showBottomHints();
 }
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void showColorWordTitle()
 {
   display.fillScreen(WHITE);
@@ -1476,7 +1479,7 @@ void loop()
     }
     break;
   }
-  /////////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 case VISUAL_MEMORY_DIFFICULTY_SELECT:
 {
   if (key) {
@@ -1524,7 +1527,7 @@ case VISUAL_MEMORY_DIFFICULTY_SELECT:
   break;
   }
 
-///////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   case VISUAL_MEMORY_INPUT:
   {
     if (key == '*')
@@ -1560,7 +1563,7 @@ case VISUAL_MEMORY_DIFFICULTY_SELECT:
           currentStep++;
           if (currentStep == colorSequenceLength)
           {
-            int stars = maxWrongTries - visualMemoryWrongTries;
+            int stars = 10 - visualMemoryWrongTries;
             showCenteredStarsAndScore(stars); // Show only stars and score, centered
             delay(2000);                      // Show for 2 seconds
             showMenu();                       // Return to games menu
@@ -1573,7 +1576,7 @@ case VISUAL_MEMORY_DIFFICULTY_SELECT:
         {
           visualMemoryWrongTries++; // Increment on wrong try
           // Check if the number of wrong tries exceeds the maximum allowed
-          if (visualMemoryWrongTries >= maxWrongTries)
+          if (visualMemoryWrongTries >= maxWrongTries_VM)
           {
             display.fillScreen(WHITE);
             display.setTextColor(RED);
@@ -1604,7 +1607,7 @@ case VISUAL_MEMORY_DIFFICULTY_SELECT:
           display.setCursor(20, 100);
           display.print("Repeat the sequence!");
           showBottomHints();
-          showTriesRemaining(maxWrongTries - visualMemoryWrongTries);
+          showTriesRemaining(maxWrongTries_VM - visualMemoryWrongTries);
           currentStep = 0;
         }
       }
@@ -1791,6 +1794,7 @@ case VISUAL_MEMORY_DIFFICULTY_SELECT:
     }
     break;
   }
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 case CODE_BREAKER_DIFFICULTY_SELECT:
 {
   if (key) {
@@ -1826,7 +1830,7 @@ case CODE_BREAKER_DIFFICULTY_SELECT:
   }
   break;
 }
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   case CODE_BREAKER:
   {
     if (key)
