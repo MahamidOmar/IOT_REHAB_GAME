@@ -203,6 +203,7 @@ int codeBreakerWrongTries = 0;
 int visualMemoryWrongTries = 0;
 int maxWrongTries = 5;
 int maxWrongTries_VM = 3; // For Visual Memory game
+
 void showLedReactionScore(int score)
 {
   display.fillScreen(WHITE);
@@ -218,6 +219,7 @@ void showLedReactionScore(int score)
   display.print(msg);
   delay(2000); // Show for 2 seconds
 }
+
 void showLedReactionDifficultySelect()
 {
   display.fillScreen(WHITE);
@@ -469,6 +471,15 @@ void showMultiplayerPlayerSelect1()
     display.print(String(i + 1) + ") " + playerNames[i]);
     y += 30;
   }
+  // --- Add this for # logout at bottom right ---
+  const char *logoutText = "# logout";
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.setTextSize(1);
+  display.setTextColor(DARKGREY);
+  display.getTextBounds(logoutText, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor(SCREEN_WIDTH - w, SCREEN_HEIGHT - 10);
+  display.print(logoutText);
 }
 
 void showMultiplayerPlayerSelect2(byte excludeIndex)
@@ -489,6 +500,15 @@ void showMultiplayerPlayerSelect2(byte excludeIndex)
     y += 30;
     optionNum++;
   }
+  // --- Add this for # logout at bottom right ---
+  const char *logoutText = "# logout";
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.setTextSize(1);
+  display.setTextColor(DARKGREY);
+  display.getTextBounds(logoutText, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor(SCREEN_WIDTH - w, SCREEN_HEIGHT - 10);
+  display.print(logoutText);
 }
 
 void showNextLedReactionColor()
@@ -565,6 +585,15 @@ void showMultiplayerMenu()
   int y = 110;
   display.setCursor(20, y);
   display.print("1) Code Breaker");
+  // --- Add this for # logout at bottom right ---
+  const char *logoutText = "# logout";
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.setTextSize(1);
+  display.setTextColor(DARKGREY);
+  display.getTextBounds(logoutText, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor(SCREEN_WIDTH - w, SCREEN_HEIGHT - 10);
+  display.print(logoutText);
 }
 
 void showMenuMessage(const char *msg)
@@ -689,6 +718,7 @@ void showVisualMemoryDifficultyMenu()
   display.print("3) Hard (10 colors)");
   showBottomHints();
 }
+
 void showInputProgress(const char *inputBuffer, byte inputIndex)
 {
   int y = 190;
@@ -1159,8 +1189,7 @@ void loop()
     {
       showModeSelect();
       currentState = MODE_SELECT;
-      // Optionally reset other variables here if needed
-      return; // or break; if not in a function
+      return;
     }
 
     if (key && key >= '1' && key <= '0' + playerCount)
@@ -1477,7 +1506,7 @@ void loop()
     {
       showModeSelect();
       currentState = MODE_SELECT;
-      return; // or break; if not in a function
+      return;
     }
 
     if (key && key >= '1' && key <= '4' && key - '0' <= playerCount)
@@ -1557,6 +1586,7 @@ void loop()
     }
     break;
   }
+
   case VISUAL_MEMORY_DIFFICULTY_SELECT:
   {
     if (key)
