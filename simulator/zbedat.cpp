@@ -7,6 +7,16 @@
 #include "esp_wpa2.h" // Only needed for WPA2-Enterprise
 
 // --- PIN DEFINITIONS (TOP) ---
+unsigned long colorWordStepStartTime = 0;
+
+int colorWordStars = 0;
+enum Difficulty { EASY, MEDIUM, HARD };
+Difficulty colorWordDifficulty = EASY;
+
+const unsigned long colorWordDurations[3] = {7000, 4000, 2000}; // ms: easy, medium, hard
+// Global variables (near the top of your file)
+unsigned long colorWordStepDuration = 7000; // Default to easy (7 seconds)
+
 #define TFT_SCLK 18
 #define TFT_MOSI 23
 #define TFT_MISO 19
@@ -135,10 +145,12 @@ enum State
   CODE_BREAKER_MULTI_TURN_P2,
   MENU,
   CODE_BREAKER,
+  COLOR_WORD_DIFFICULTY_SELECT,
+  COLOR_WORD_CHALLENGE,
   VISUAL_MEMORY,
   VISUAL_MEMORY_INPUT,
   VISUAL_MEMORY_RESULT,
-  COLOR_WORD_CHALLENGE,
+  
   COLOR_WORD_CHALLENGE_INPUT,
   LED_REACTION
 };
@@ -165,6 +177,21 @@ int playerCount = MAX_PLAYERS;
 int codeBreakerWrongTries = 0;
 int visualMemoryWrongTries = 0;
 const int maxWrongTries = 5;
+
+
+void showColorWordDifficultySelect() {
+  display.fillScreen(WHITE);
+  display.setTextSize(2);
+  display.setTextColor(BLACK);
+  display.setCursor(40, 60);
+  display.print("Select Difficulty:");
+  display.setCursor(40, 100);
+  display.print("1. Easy (7s)");
+  display.setCursor(40, 140);
+  display.print("2. Medium (4s)");
+  display.setCursor(40, 180);
+  display.print("3. Hard (2s)");
+}
 
 // --- Color-Word Challenge helpers ---
 void generateColorWordChallengeSequences(uint8_t seq1[], uint8_t seq2[], uint8_t length)
@@ -1411,14 +1438,10 @@ void loop()
       // --- Color-Word Challenge menu handler ---
       else if (key == '3')
       {
-        showColorWordTitle(); // <-- Centered title with delay
-        generateColorWordChallengeSequences(cwcSeq1, cwcSeq2, COLOR_WORD_CHALLENGE_LENGTH);
-        currentStep = 0;
-        colorWordCurrentStep = 0;
-        colorWordWrongTries = 0;
-        // Show the first challenge step
-        showColorWordChallengeStep(currentStep);
-        currentState = COLOR_WORD_CHALLENGE;
+        showColorWordDifficultySelect();
+        currentState = COLOR_WORD_DIFFICULTY_SELECT;
+        
+        
       }
       else if (key == '4')
       {
@@ -1528,73 +1551,133 @@ void loop()
     break;
   }
 
+
+case COLOR_WORD_DIFFICULTY_SELECT:
+{
+  if (key == '1') {
+      colorWordStepDuration = colorWordDurations[EASY];
+      colorWordDifficulty = EASY;
+      // Prepare game
+      generateColorWordChallengeSequences(cwcSeq1, cwcSeq2, COLOR_WORD_CHALLENGE_LENGTH);
+      colorWordCurrentStep = 0;
+      colorWordWrongTries = 0;
+      colorWordStepStartTime = 0;
+      showColorWordChallengeStep(0);
+      currentState = COLOR_WORD_CHALLENGE;
+    } else if (key == '2') {
+      colorWordStepDuration = colorWordDurations[MEDIUM];
+      colorWordDifficulty = MEDIUM;
+      // Prepare game
+      generateColorWordChallengeSequences(cwcSeq1, cwcSeq2, COLOR_WORD_CHALLENGE_LENGTH);
+      colorWordCurrentStep = 0;
+      colorWordWrongTries = 0;
+      colorWordStepStartTime = 0;
+      showColorWordChallengeStep(0);
+      currentState = COLOR_WORD_CHALLENGE;
+    } else if (key == '3') {
+      colorWordStepDuration = colorWordDurations[HARD];
+      colorWordDifficulty = HARD;
+      // Prepare game
+      generateColorWordChallengeSequences(cwcSeq1, cwcSeq2, COLOR_WORD_CHALLENGE_LENGTH);
+      colorWordCurrentStep = 0;
+      colorWordWrongTries = 0;
+      colorWordStepStartTime = 0;
+      showColorWordChallengeStep(0);
+      currentState = COLOR_WORD_CHALLENGE;
+    }
+  break;
+  }
+
+
     // --- Color-Word Challenge state handler (just shows the first step for now) ---
   case COLOR_WORD_CHALLENGE:
-  {
-    // Allow menu/logout
-    if (key == '*')
-    {
+{
+  unsigned long now = millis();
+  if (colorWordStepStartTime == 0) {
+    colorWordStepStartTime = now;
+  }
+  // Allow menu/logout
+  if (key == '*') {
+    showMenu();
+    currentState = MENU;
+    colorWordWrongTries = 0;
+    colorWordCurrentStep = 0;
+    break;
+  }
+  if (key == '#') {
+    showModeSelect();
+    currentState = MODE_SELECT;
+    colorWordWrongTries = 0;
+    colorWordCurrentStep = 0;
+    break;
+  }
+
+
+
+
+  // Start timer for each new word
+  if (colorWordStepStartTime == 0) {
+    colorWordStepStartTime = now;
+  }
+
+  // Handle timeout: if 7 seconds pass, count as wrong and advance
+  if (now - colorWordStepStartTime >= colorWordStepDuration) {
+    colorWordWrongTries++;
+    colorWordCurrentStep++;
+    colorWordStepStartTime = 0; // reset for next word
+
+    if (colorWordCurrentStep == COLOR_WORD_CHALLENGE_LENGTH) {
+      int stars = colorWordMaxTries - colorWordWrongTries;
+      showCenteredStarsAndScore(stars);
+      delay(2000);
       showMenu();
       currentState = MENU;
       colorWordWrongTries = 0;
+      colorWordCurrentStep = 0;
       break;
+    } else {
+      showColorWordChallengeStep(colorWordCurrentStep);
     }
-    if (key == '#')
-    {
-      showModeSelect();
-      currentState = MODE_SELECT;
-      colorWordWrongTries = 0;
-      break;
-    }
-
-    // Button input handling
-    int buttonPins[3] = {RED_BUTTON_PIN, BLUE_BUTTON_PIN, GREEN_BUTTON_PIN};
-    for (int i = 0; i < 3; i++)
-    {
-      int reading = digitalRead(buttonPins[i]);
-      if (lastButtonState[i] == HIGH && reading == LOW && (millis() - lastDebounceTime[i]) > debounceDelay)
-      {
-        lastDebounceTime[i] = millis();
-        // The correct answer is the color in cwcSeq1[colorWordCurrentStep]
-        if (i == cwcSeq1[colorWordCurrentStep])
-        {
-          // Correct!
-          colorWordCurrentStep++;
-          if (colorWordCurrentStep == COLOR_WORD_CHALLENGE_LENGTH)
-          {
-            // Game complete, show stars/score
-            int stars = colorWordMaxTries - colorWordWrongTries;
-            showCenteredStarsAndScore(stars);
-            delay(2000);
-            showMenu();
-            currentState = MENU;
-            colorWordWrongTries = 0;
-            colorWordCurrentStep = 0;
-            break;
-          }
-          else
-          {
-            showColorWordChallengeStep(colorWordCurrentStep);
-          }
-        }
-        else
-        {
-          // Wrong!
-          colorWordWrongTries++;
-          // Optional: flash screen/message for wrong answer
-          display.fillScreen(WHITE);
-          display.setTextSize(2);
-          display.setTextColor(RED);
-          display.setCursor(40, 120);
-          display.print("Wrong!");
-          delay(1000);
-          showColorWordChallengeStep(colorWordCurrentStep);
-        }
-      }
-      lastButtonState[i] = reading;
-    }
-    break;
   }
+
+  // Handle button presses
+  int buttonPins[3] = {RED_BUTTON_PIN, BLUE_BUTTON_PIN, GREEN_BUTTON_PIN};
+  for (int i = 0; i < 3; i++) {
+    int reading = digitalRead(buttonPins[i]);
+    if (lastButtonState[i] == HIGH && reading == LOW && (now - lastDebounceTime[i]) > debounceDelay) {
+      lastDebounceTime[i] = now;
+
+      if (i == cwcSeq1[colorWordCurrentStep]) {
+        // Correct: advance and award star (no need to increment wrongTries)
+        colorWordCurrentStep++;
+      } else {
+        // Wrong: advance, count as wrong, no retry
+        colorWordWrongTries++;
+        colorWordCurrentStep++;
+      }
+      colorWordStepStartTime = 0; // reset timer for next word
+
+      if (colorWordCurrentStep == COLOR_WORD_CHALLENGE_LENGTH) {
+        int stars = colorWordMaxTries - colorWordWrongTries;
+        showCenteredStarsAndScore(stars);
+        delay(2000);
+        showMenu();
+        currentState = MENU;
+        colorWordWrongTries = 0;
+        colorWordCurrentStep = 0;
+        break;
+      } else {
+        showColorWordChallengeStep(colorWordCurrentStep);
+      }
+    }
+    lastButtonState[i] = reading;
+  }
+  break;
+}
+
+
+
+  
 
   case LED_REACTION:
   {
