@@ -83,6 +83,15 @@ uint8_t cbMultiInputIndex = 0; // For multiplayer code breaker digit entry
 bool player1Guessed = false;
 bool player2Guessed = false;
 
+// --- Last guess results for each player ---
+char player1LastGuess[4] = "";
+int player1LastExact = 0;
+int player1LastPartial = 0;
+
+char player2LastGuess[4] = "";
+int player2LastExact = 0;
+int player2LastPartial = 0;
+
 // Keypad definitions
 const byte ROWS = 4;
 const byte COLS = 3;
@@ -904,6 +913,27 @@ void showMaskedInputProgress(const char *inputBuffer, byte inputIndex)
   }
 }
 
+// Show the last feedback for a player in code breaker multiplayer
+void showLastFeedback(uint8_t player, const char *lastGuess, int lastExact, int lastPartial)
+{
+  display.fillScreen(WHITE);
+  display.setTextSize(2);
+  display.setTextColor(BLACK);
+  display.setCursor(20, 60);
+  display.print("Player ");
+  display.print(player);
+  display.print(" Last: ");
+  display.print(lastGuess);
+  display.setCursor(20, 100);
+  display.setTextColor(GREEN);
+  display.print("Exact: ");
+  display.print(lastExact);
+  display.setTextColor(RED);
+  display.setCursor(20, 140);
+  display.print("Partial: ");
+  display.print(lastPartial);
+}
+
 void setup()
 {
   // Initialize NeoPixel LEDs
@@ -1107,7 +1137,7 @@ void loop()
       display.fillRect(0, 190, SCREEN_WIDTH, 30, WHITE); // Clear input line
       delay(300);
       cbMultiInputIndex = 0;
-      promptShown1 = false;     // Reset for next time
+      promptShown1 = false; // Reset for next time
       currentState = CODE_BREAKER_MULTI_SECRET2;
     }
     break;
@@ -1139,7 +1169,6 @@ void loop()
       cbMultiInputIndex = 0;
       promptShown2 = false; // Reset for next time
       // Now move to guessing phase...
-      showGuessScreen(1, player1Tries); // Or your equivalent
       currentState = CODE_BREAKER_MULTI_TURN;
     }
     break;
@@ -1147,11 +1176,26 @@ void loop()
 
   case CODE_BREAKER_MULTI_TURN:
   {
+    static bool feedbackShown = false;
     if (!codeBreakerMultiplayerTurn)
-    { // Player 1's turn
+    {
+      if (!feedbackShown)
+      {
+        if (player1Tries > 0)
+        { // Only after first try
+          showLastFeedback(1, player1LastGuess, player1LastExact, player1LastPartial);
+          delay(1000);
+        }
+        showGuessScreen(1, player1Tries);
+        // showMaskedInputProgress(player1Guess, cbMultiInputIndex); // Use your progress function
+        showInputProgress(player1Guess, 0); // <--- Show progress bar immediately!
+        feedbackShown = true;
+      }
+      // Player 1's turn
       if (key && key >= '0' && key <= '9' && cbMultiInputIndex < 3)
       {
         player1Guess[cbMultiInputIndex++] = key;
+        showInputProgress(player1Guess, cbMultiInputIndex);
       }
       if (cbMultiInputIndex == 3)
       {
@@ -1196,15 +1240,33 @@ void loop()
         }
         // Next player's turn
         codeBreakerMultiplayerTurn = true;
-        showGuessScreen(2, player2Tries);
+        // showGuessScreen(2, player2Tries);
         cbMultiInputIndex = 0;
+        memset(player1Guess, 0, sizeof(player1Guess));
+        showGuessScreen(2, player2Tries);   // <--- Show guess screen for Player 2
+        showInputProgress(player2Guess, 0); // <--- Show progress bar for Player 2
+        feedbackShown = false;              // Reset feedback for next turn
       }
     }
+    // Player 2's turn
     else
     {
+      if (!feedbackShown)
+      {
+        if (player2Tries > 0)
+        {
+          showLastFeedback(2, player2LastGuess, player2LastExact, player2LastPartial);
+          delay(1000);
+        }
+        // showGuessScreen(2, player2Tries);
+        // showMaskedInputProgress(player2Guess, cbMultiInputIndex);
+        // showInputProgress(player2Guess, 0); // <--- Show progress bar immediately!
+        feedbackShown = true;
+      }
       if (key && key >= '0' && key <= '9' && cbMultiInputIndex < 3)
       {
         player2Guess[cbMultiInputIndex++] = key;
+        showInputProgress(player2Guess, cbMultiInputIndex);
       }
       if (cbMultiInputIndex == 3)
       {
@@ -1249,11 +1311,14 @@ void loop()
         }
         // Next player's turn
         codeBreakerMultiplayerTurn = false;
-        showGuessScreen(1, player1Tries);
-        inputIndex = 0;
+        // showGuessScreen(1, player1Tries);
+        cbMultiInputIndex = 0;
+        memset(player2Guess, 0, sizeof(player2Guess));
+        // showGuessScreen(1, player1Tries);   // <--- Show guess screen for Player 1
+        // showInputProgress(player1Guess, 0); // <--- Show progress bar for Player 1
+        feedbackShown = false;
       }
     }
-    // ... Player 2's turn handled below ...
     break;
   }
 
