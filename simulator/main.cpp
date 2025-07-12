@@ -131,7 +131,8 @@ enum State
   MULTI_MENU,
   CODE_BREAKER_MULTI_SECRET1,
   CODE_BREAKER_MULTI_SECRET2,
-  CODE_BREAKER_MULTI_TURN,
+  CODE_BREAKER_MULTI_TURN_P1,
+  CODE_BREAKER_MULTI_TURN_P2,
   MENU,
   CODE_BREAKER,
   VISUAL_MEMORY,
@@ -1169,155 +1170,159 @@ void loop()
       cbMultiInputIndex = 0;
       promptShown2 = false; // Reset for next time
       // Now move to guessing phase...
-      currentState = CODE_BREAKER_MULTI_TURN;
+      currentState = CODE_BREAKER_MULTI_TURN_P1;
     }
     break;
   }
 
-  case CODE_BREAKER_MULTI_TURN:
+  case CODE_BREAKER_MULTI_TURN_P1:
   {
     static bool feedbackShown = false;
-    if (!codeBreakerMultiplayerTurn)
+    if (!feedbackShown)
     {
-      if (!feedbackShown)
+      if (player1Tries > 0)
       {
-        if (player1Tries > 0)
-        { // Only after first try
-          showLastFeedback(1, player1LastGuess, player1LastExact, player1LastPartial);
-          delay(1000);
-        }
-        showGuessScreen(1, player1Tries);
-        // showMaskedInputProgress(player1Guess, cbMultiInputIndex); // Use your progress function
-        showInputProgress(player1Guess, 0); // <--- Show progress bar immediately!
-        feedbackShown = true;
+        showLastFeedback(1, player1LastGuess, player1LastExact, player1LastPartial);
+        delay(2000);
       }
-      // Player 1's turn
-      if (key && key >= '0' && key <= '9' && cbMultiInputIndex < 3)
-      {
-        player1Guess[cbMultiInputIndex++] = key;
-        showInputProgress(player1Guess, cbMultiInputIndex);
-      }
-      if (cbMultiInputIndex == 3)
-      {
-        player1Guess[3] = '\0';
-        int exact = 0, partial = 0;
-        cbMultiCountMatches(player1Guess, player2Secret, exact, partial);
-        player1Tries++;
-
-        // Show feedback
-        display.fillScreen(WHITE);
-        display.setTextSize(2);
-        display.setTextColor(BLACK);
-        display.setCursor(20, 60);
-        display.print("Player 1 Guess: ");
-        display.print(player1Guess);
-        display.setCursor(20, 100);
-        display.setTextColor(GREEN);
-        display.print("Exact: ");
-        display.print(exact);
-        display.setTextColor(RED);
-        display.setCursor(20, 140);
-        display.print("Partial: ");
-        display.print(partial);
-        delay(1500);
-
-        if (exact == 3)
-        {
-          display.fillScreen(WHITE);
-          display.setTextColor(GREEN);
-          display.setTextSize(2);
-          display.setCursor(20, 100);
-          display.print("Player 1 Wins!");
-          display.setCursor(20, 140);
-          display.setTextSize(1);
-          display.setTextColor(BLACK);
-          display.print("Tries: ");
-          display.print(player1Tries);
-          delay(2500);
-          showMenu();
-          currentState = MENU;
-          break;
-        }
-        // Next player's turn
-        codeBreakerMultiplayerTurn = true;
-        // showGuessScreen(2, player2Tries);
-        cbMultiInputIndex = 0;
-        memset(player1Guess, 0, sizeof(player1Guess));
-        showGuessScreen(2, player2Tries);   // <--- Show guess screen for Player 2
-        showInputProgress(player2Guess, 0); // <--- Show progress bar for Player 2
-        feedbackShown = false;              // Reset feedback for next turn
-      }
+      showGuessScreen(1, player1Tries);
+      showInputProgress(player1Guess, 0);
+      feedbackShown = true;
     }
-    // Player 2's turn
-    else
+    if (key && key >= '0' && key <= '9' && cbMultiInputIndex < 3)
     {
-      if (!feedbackShown)
-      {
-        if (player2Tries > 0)
-        {
-          showLastFeedback(2, player2LastGuess, player2LastExact, player2LastPartial);
-          delay(1000);
-        }
-        // showGuessScreen(2, player2Tries);
-        // showMaskedInputProgress(player2Guess, cbMultiInputIndex);
-        // showInputProgress(player2Guess, 0); // <--- Show progress bar immediately!
-        feedbackShown = true;
-      }
-      if (key && key >= '0' && key <= '9' && cbMultiInputIndex < 3)
-      {
-        player2Guess[cbMultiInputIndex++] = key;
-        showInputProgress(player2Guess, cbMultiInputIndex);
-      }
-      if (cbMultiInputIndex == 3)
-      {
-        player2Guess[3] = '\0';
-        int exact = 0, partial = 0;
-        cbMultiCountMatches(player2Guess, player1Secret, exact, partial);
-        player2Tries++;
+      player1Guess[cbMultiInputIndex++] = key;
+      showInputProgress(player1Guess, cbMultiInputIndex);
+    }
+    if (cbMultiInputIndex == 3)
+    {
+      player1Guess[3] = '\0';
+      int exact = 0, partial = 0;
+      cbMultiCountMatches(player1Guess, player2Secret, exact, partial);
+      player1Tries++;
 
-        // Show feedback
+      // Store feedback for next turn
+      strcpy(player1LastGuess, player1Guess);
+      player1LastExact = exact;
+      player1LastPartial = partial;
+
+      // Show feedback
+      display.fillScreen(WHITE);
+      display.setTextSize(2);
+      display.setTextColor(BLACK);
+      display.setCursor(20, 60);
+      display.print("Player 1 Guess: ");
+      display.print(player1Guess);
+      display.setCursor(20, 100);
+      display.setTextColor(GREEN);
+      display.print("Exact: ");
+      display.print(exact);
+      display.setTextColor(RED);
+      display.setCursor(20, 140);
+      display.print("Partial: ");
+      display.print(partial);
+      delay(1500);
+
+      if (exact == 3)
+      {
         display.fillScreen(WHITE);
-        display.setTextSize(2);
-        display.setTextColor(BLACK);
-        display.setCursor(20, 60);
-        display.print("Player 2 Guess: ");
-        display.print(player2Guess);
-        display.setCursor(20, 100);
         display.setTextColor(GREEN);
-        display.print("Exact: ");
-        display.print(exact);
-        display.setTextColor(RED);
+        display.setTextSize(2);
+        display.setCursor(20, 100);
+        display.print("Player 1 Wins!");
         display.setCursor(20, 140);
-        display.print("Partial: ");
-        display.print(partial);
-        delay(1500);
-
-        if (exact == 3)
-        {
-          display.fillScreen(WHITE);
-          display.setTextColor(GREEN);
-          display.setTextSize(2);
-          display.setCursor(20, 100);
-          display.print("Player 2 Wins!");
-          display.setCursor(20, 140);
-          display.setTextSize(1);
-          display.setTextColor(BLACK);
-          display.print("Tries: ");
-          display.print(player2Tries);
-          delay(2500);
-          showMenu();
-          currentState = MENU;
-          break;
-        }
-        // Next player's turn
-        codeBreakerMultiplayerTurn = false;
-        // showGuessScreen(1, player1Tries);
-        cbMultiInputIndex = 0;
-        memset(player2Guess, 0, sizeof(player2Guess));
-        // showGuessScreen(1, player1Tries);   // <--- Show guess screen for Player 1
-        // showInputProgress(player1Guess, 0); // <--- Show progress bar for Player 1
+        display.setTextSize(1);
+        display.setTextColor(BLACK);
+        display.print("Tries: ");
+        display.print(player1Tries);
+        delay(2500);
+        showMenu();
+        currentState = MENU;
         feedbackShown = false;
+        cbMultiInputIndex = 0;
+        break;
       }
+      // Next player's turn
+      cbMultiInputIndex = 0;
+      memset(player1Guess, 0, sizeof(player1Guess));
+      feedbackShown = false;
+      currentState = CODE_BREAKER_MULTI_TURN_P2; // Switch to Player 2
+    }
+    break;
+  }
+
+  case CODE_BREAKER_MULTI_TURN_P2:
+  {
+    static bool feedbackShown = false;
+    if (!feedbackShown)
+    {
+      if (player2Tries > 0)
+      {
+        showLastFeedback(2, player2LastGuess, player2LastExact, player2LastPartial);
+        delay(2000);
+      }
+      showGuessScreen(2, player2Tries);
+      showInputProgress(player2Guess, 0);
+      feedbackShown = true;
+    }
+    if (key && key >= '0' && key <= '9' && cbMultiInputIndex < 3)
+    {
+      player2Guess[cbMultiInputIndex++] = key;
+      showInputProgress(player2Guess, cbMultiInputIndex);
+    }
+    if (cbMultiInputIndex == 3)
+    {
+      player2Guess[3] = '\0';
+      int exact = 0, partial = 0;
+      cbMultiCountMatches(player2Guess, player1Secret, exact, partial);
+      player2Tries++;
+
+      // Store feedback for next turn
+      strcpy(player2LastGuess, player2Guess);
+      player2LastExact = exact;
+      player2LastPartial = partial;
+
+      // Show feedback
+      display.fillScreen(WHITE);
+      display.setTextSize(2);
+      display.setTextColor(BLACK);
+      display.setCursor(20, 60);
+      display.print("Player 2 Guess: ");
+      display.print(player2Guess);
+      display.setCursor(20, 100);
+      display.setTextColor(GREEN);
+      display.print("Exact: ");
+      display.print(exact);
+      display.setTextColor(RED);
+      display.setCursor(20, 140);
+      display.print("Partial: ");
+      display.print(partial);
+      delay(1500);
+
+      if (exact == 3)
+      {
+        display.fillScreen(WHITE);
+        display.setTextColor(GREEN);
+        display.setTextSize(2);
+        display.setCursor(20, 100);
+        display.print("Player 2 Wins!");
+        display.setCursor(20, 140);
+        display.setTextSize(1);
+        display.setTextColor(BLACK);
+        display.print("Tries: ");
+        display.print(player2Tries);
+        delay(2500);
+        showMenu();
+        currentState = MENU;
+        feedbackShown = false;
+        cbMultiInputIndex = 0;
+        break;
+      }
+      // Next player's turn
+      cbMultiInputIndex = 0;
+      memset(player2Guess, 0, sizeof(player2Guess));
+      feedbackShown = false;
+      currentState = CODE_BREAKER_MULTI_TURN_P1; // Switch to Player 1
     }
     break;
   }
