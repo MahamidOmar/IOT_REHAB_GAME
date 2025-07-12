@@ -142,6 +142,7 @@ enum State
   CODE_BREAKER,
   CODE_BREAKER_DIFFICULTY_SELECT, // For single player Code Breaker difficulty menu
   VISUAL_MEMORY,
+  VISUAL_MEMORY_DIFFICULTY_SELECT,
   VISUAL_MEMORY_INPUT,
   VISUAL_MEMORY_RESULT,
   COLOR_WORD_CHALLENGE,
@@ -493,6 +494,21 @@ void showCodeBreakerTitle()
   display.print("Code breaker game");
   delay(2000);
   display.fillScreen(WHITE);
+  showBottomHints();
+}
+// Show the difficulty selection screen for Visual Memory
+void showVisualMemoryDifficultyMenu() {
+  display.fillScreen(WHITE);
+  display.setTextColor(BLACK);
+  display.setTextSize(2);
+  display.setCursor(20, 60);
+  display.print("Select Difficulty:");
+  display.setCursor(20, 110);
+  display.print("1) Easy (5 colors)");
+  display.setCursor(20, 150);
+  display.print("2) Medium (8 colors)");
+  display.setCursor(20, 190);
+  display.print("3) Hard (10 colors)");
   showBottomHints();
 }
 
@@ -1392,7 +1408,9 @@ void loop()
         showCodeBreakerDifficultyMenu();
       }
       else if (key == '2')
-      { // Visual Memory
+      {  currentState = VISUAL_MEMORY_DIFFICULTY_SELECT;
+        showVisualMemoryDifficultyMenu();
+        /*// Visual Memory
         display.fillScreen(WHITE);
         display.setTextColor(BLACK);
         display.setTextSize(2);
@@ -1425,7 +1443,7 @@ void loop()
         showBottomHints();
         currentStep = 0;
         lastButtonState[0] = lastButtonState[1] = lastButtonState[2] = HIGH;
-        currentState = VISUAL_MEMORY_INPUT;
+        currentState = VISUAL_MEMORY_INPUT;*/
       }
       // --- Color-Word Challenge menu handler ---
       else if (key == '3')
@@ -1458,7 +1476,55 @@ void loop()
     }
     break;
   }
+  /////////////////////////////////////////////////////////////////////////////////
+case VISUAL_MEMORY_DIFFICULTY_SELECT:
+{
+  if (key) {
+    switch (key) {
+      case '1': // Easy
+        colorSequenceLength = 5;
+        break;
+      case '2': // Medium
+        colorSequenceLength = 8;
+        break;
+      case '3': // Hard
+        colorSequenceLength = 10;
+        break;
+      default:
+        // Ignore other keys
+        return;
+    }
+    visualMemoryWrongTries = 0; // Reset tries
 
+    // Now start the Visual Memory game as before:
+    generateRandomColorSequence(colorSequence, colorSequenceLength);
+    for (uint8_t i = 0; i < colorSequenceLength; i++)
+    {
+      showColorOnDisplay(colorSequence[i]);
+      showColorOnRings(colorSequence[i]);
+      delay(2000);
+      turnOffAllRings();
+      if (i < colorSequenceLength - 1)
+      {
+        display.fillScreen(WHITE);
+        delay(1000);
+      }
+      turnOffAllRings();
+    }
+    display.fillScreen(WHITE);
+    display.setTextColor(BLACK);
+    display.setTextSize(2);
+    display.setCursor(20, 100);
+    display.print("Repeat the sequence!");
+    showBottomHints();
+    currentStep = 0;
+    lastButtonState[0] = lastButtonState[1] = lastButtonState[2] = HIGH;
+    currentState = VISUAL_MEMORY_INPUT;
+  }
+  break;
+  }
+
+///////////////////////////////////////////////////////////////////////////////////////
   case VISUAL_MEMORY_INPUT:
   {
     if (key == '*')
