@@ -6,6 +6,33 @@
 #include <Adafruit_NeoPixel.h>
 #include "esp_wpa2.h" // Only needed for WPA2-Enterprise
 
+unsigned long colorWordStepStartTime = 0;
+enum LedReactionDifficulty
+{
+  LED_EASY,
+  LED_MEDIUM,
+  LED_HARD
+};
+LedReactionDifficulty ledReactionDifficulty = LED_EASY;
+const unsigned long ledReactionDurations[3] = {2000, 1000, 500}; // ms: easy, medium, hard
+unsigned long ledReactionStepDuration = 2000;                    // default to easy
+
+int colorWordStars = 0;
+enum Difficulty
+{
+  EASY,
+  MEDIUM,
+  HARD
+};
+Difficulty colorWordDifficulty = EASY;
+bool ledReactionWaiting = false; // true when in the white screen delay
+unsigned long ledReactionDelayStart = 0;
+const unsigned long ledReactionDelayDuration = 1000; // 1 second
+
+const unsigned long colorWordDurations[3] = {7000, 4000, 2000}; // ms: easy, medium, hard
+// Global variables (near the top of your file)
+unsigned long colorWordStepDuration = 7000; // Default to easy (7 seconds)
+
 // --- PIN DEFINITIONS (TOP) ---
 #define TFT_SCLK 18
 #define TFT_MOSI 23
@@ -50,9 +77,6 @@ const unsigned long ledReactionGameDuration = 20000; // 20 seconds in ms
 int ledReactionCorrect = 0;
 int ledReactionCurrentColor = 0;
 bool ledReactionActive = false;
-bool ledReactionWaiting = false; // Are we in the 1s delay between rounds?
-unsigned long ledReactionDelayStart = 0;
-const unsigned long ledReactionDelayDuration = 1000; // 1 second between rounds
 
 // Multiplayer game variables
 byte multiplayerPlayer1 = 0; // 1-based index
@@ -135,10 +159,13 @@ enum State
   CODE_BREAKER_MULTI_TURN_P2,
   MENU,
   CODE_BREAKER,
+  COLOR_WORD_DIFFICULTY_SELECT,
+  COLOR_WORD_CHALLENGE,
   VISUAL_MEMORY,
   VISUAL_MEMORY_INPUT,
   VISUAL_MEMORY_RESULT,
-  COLOR_WORD_CHALLENGE,
+  LED_REACTION_DIFFICULTY_SELECT,
+
   COLOR_WORD_CHALLENGE_INPUT,
   LED_REACTION
 };
@@ -165,6 +192,65 @@ int playerCount = MAX_PLAYERS;
 int codeBreakerWrongTries = 0;
 int visualMemoryWrongTries = 0;
 const int maxWrongTries = 5;
+void showLedReactionScore(int score)
+{
+  display.fillScreen(WHITE);
+  display.setTextSize(3);
+  display.setTextColor(BLACK);
+  String msg = "Score: " + String(score);
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(msg.c_str(), 0, 0, &x1, &y1, &w, &h);
+  int x = (SCREEN_WIDTH - w) / 2;
+  int y = (SCREEN_HEIGHT - 3 * 8) / 2;
+  display.setCursor(x, y);
+  display.print(msg);
+  delay(2000); // Show for 2 seconds
+}
+
+void showLedReactionDifficultySelect()
+{
+  display.fillScreen(WHITE);
+  display.setTextSize(2);
+  display.setTextColor(BLACK);
+  display.setCursor(40, 60);
+  display.print("Select Difficulty:");
+  display.setCursor(40, 100);
+  display.print("1. Easy (2s)");
+  display.setCursor(40, 140);
+  display.print("2. Medium (1s)");
+  display.setCursor(40, 180);
+  display.print("3. Hard (0.5s)");
+}
+
+void showColorWordDifficultySelect()
+{
+  display.fillScreen(WHITE);
+  display.setTextSize(2);
+  display.setTextColor(BLACK);
+  display.setCursor(40, 60);
+  display.print("Select Difficulty:");
+  display.setCursor(40, 100);
+  display.print("1. Easy (7s)");
+  display.setCursor(40, 140);
+  display.print("2. Medium (4s)");
+  display.setCursor(40, 180);
+  display.print("3. Hard (2s)");
+}
+
+void showColorOnRings(int colorIndex)
+{
+  uint32_t color;
+  if (colorIndex == 0)
+    color = leds.Color(255, 0, 0); // Red
+  else if (colorIndex == 1)
+    color = leds.Color(0, 0, 255); // Blue
+  else
+    color = leds.Color(0, 255, 0); // Green
+  for (int i = 0; i < WS2812_NUM_LEDS; i++)
+    leds.setPixelColor(i, color);
+  leds.show();
+}
 
 // --- Color-Word Challenge helpers ---
 void generateColorWordChallengeSequences(uint8_t seq1[], uint8_t seq2[], uint8_t length)
@@ -395,6 +481,25 @@ void showMultiplayerPlayerSelect2(byte excludeIndex)
   }
 }
 
+void showNextLedReactionColor()
+{
+  ledReactionCurrentColor = random(0, 3);
+  uint32_t color;
+  if (ledReactionCurrentColor == 0)
+    color = leds.Color(255, 0, 0); // Red
+  else if (ledReactionCurrentColor == 1)
+    color = leds.Color(0, 0, 255); // Blue
+  else
+    color = leds.Color(0, 255, 0); // Green
+
+  for (int i = 0; i < WS2812_NUM_LEDS; i++)
+    leds.setPixelColor(i, color);
+  leds.show();
+
+  // Fill the entire TFT screen with the color (no text)
+  display.fillScreen(colorValues[ledReactionCurrentColor]);
+}
+
 void showPlayerSelected(byte player)
 {
   display.fillScreen(WHITE);
@@ -485,7 +590,7 @@ void showColorWordTitle()
   uint16_t w, h;
   display.getTextBounds(title, 0, 0, &x1, &y1, &w, &h);
   int x = (SCREEN_WIDTH - w) / 2;
-  int y = 100; // You can adjust this value for vertical position
+  int y = 100;
 
   display.setCursor(x, y);
   display.print(title);
@@ -1036,7 +1141,6 @@ void loop()
     {
       showModeSelect();
       currentState = MODE_SELECT;
-      // Optionally reset other variables here if needed
       return; // or break; if not in a function
     }
 
@@ -1078,7 +1182,6 @@ void loop()
     {
       showModeSelect();
       currentState = MODE_SELECT;
-      // Optionally reset other variables here if needed
       return; // or break; if not in a function
     }
 
@@ -1333,7 +1436,6 @@ void loop()
     {
       showModeSelect();
       currentState = MODE_SELECT;
-      // Optionally reset other variables here if needed
       return; // or break; if not in a function
     }
 
@@ -1411,25 +1513,13 @@ void loop()
       // --- Color-Word Challenge menu handler ---
       else if (key == '3')
       {
-        showColorWordTitle(); // <-- Centered title with delay
-        generateColorWordChallengeSequences(cwcSeq1, cwcSeq2, COLOR_WORD_CHALLENGE_LENGTH);
-        currentStep = 0;
-        colorWordCurrentStep = 0;
-        colorWordWrongTries = 0;
-        // Show the first challenge step
-        showColorWordChallengeStep(currentStep);
-        currentState = COLOR_WORD_CHALLENGE;
+        showColorWordDifficultySelect();
+        currentState = COLOR_WORD_DIFFICULTY_SELECT;
       }
       else if (key == '4')
       {
-        showLedReactionTitle();
-        ledReactionCorrect = 0;
-        ledReactionActive = true;
-        ledReactionStartTime = millis();
-        ledReactionCurrentColor = random(0, 3);
-        ledReactionWaiting = false;
-        showLedReactionColor(ledReactionCurrentColor);
-        currentState = LED_REACTION;
+        showLedReactionDifficultySelect();
+        currentState = LED_REACTION_DIFFICULTY_SELECT;
       }
 
       else
@@ -1528,15 +1618,14 @@ void loop()
     break;
   }
 
-    // --- Color-Word Challenge state handler (just shows the first step for now) ---
-  case COLOR_WORD_CHALLENGE:
+  case LED_REACTION_DIFFICULTY_SELECT:
   {
-    // Allow menu/logout
     if (key == '*')
     {
       showMenu();
       currentState = MENU;
       colorWordWrongTries = 0;
+      colorWordCurrentStep = 0;
       break;
     }
     if (key == '#')
@@ -1544,50 +1633,195 @@ void loop()
       showModeSelect();
       currentState = MODE_SELECT;
       colorWordWrongTries = 0;
+      colorWordCurrentStep = 0;
+      break;
+    }
+    if (key == '1')
+    {
+      ledReactionDifficulty = LED_EASY;
+      ledReactionStepDuration = ledReactionDurations[LED_EASY];
+      // Prepare game
+      ledReactionCorrect = 0;
+      ledReactionStartTime = millis();
+      ledReactionActive = true;
+      ledReactionWaiting = false;
+      showNextLedReactionColor();
+      currentState = LED_REACTION;
+    }
+    else if (key == '2')
+    {
+      ledReactionDifficulty = LED_MEDIUM;
+      ledReactionStepDuration = ledReactionDurations[LED_MEDIUM];
+      // Prepare game
+      ledReactionCorrect = 0;
+      ledReactionStartTime = millis();
+      ledReactionActive = true;
+      ledReactionWaiting = false;
+      showNextLedReactionColor();
+      currentState = LED_REACTION;
+    }
+    else if (key == '3')
+    {
+      ledReactionDifficulty = LED_HARD;
+      ledReactionStepDuration = ledReactionDurations[LED_HARD];
+      // Prepare game
+      ledReactionCorrect = 0;
+      ledReactionStartTime = millis();
+      ledReactionActive = true;
+      ledReactionWaiting = false;
+      showNextLedReactionColor();
+      currentState = LED_REACTION;
+    }
+    break;
+  }
+
+  case COLOR_WORD_DIFFICULTY_SELECT:
+  {
+    if (key == '*')
+    {
+      showMenu();
+      currentState = MENU;
+      colorWordWrongTries = 0;
+      colorWordCurrentStep = 0;
+      break;
+    }
+    if (key == '#')
+    {
+      showModeSelect();
+      currentState = MODE_SELECT;
+      colorWordWrongTries = 0;
+      colorWordCurrentStep = 0;
+      break;
+    }
+    if (key == '1')
+    {
+      colorWordStepDuration = colorWordDurations[EASY];
+      colorWordDifficulty = EASY;
+      // Prepare game
+      generateColorWordChallengeSequences(cwcSeq1, cwcSeq2, COLOR_WORD_CHALLENGE_LENGTH);
+      colorWordCurrentStep = 0;
+      colorWordWrongTries = 0;
+      colorWordStepStartTime = 0;
+      showColorWordChallengeStep(0);
+      currentState = COLOR_WORD_CHALLENGE;
+    }
+    else if (key == '2')
+    {
+      colorWordStepDuration = colorWordDurations[MEDIUM];
+      colorWordDifficulty = MEDIUM;
+      // Prepare game
+      generateColorWordChallengeSequences(cwcSeq1, cwcSeq2, COLOR_WORD_CHALLENGE_LENGTH);
+      colorWordCurrentStep = 0;
+      colorWordWrongTries = 0;
+      colorWordStepStartTime = 0;
+      showColorWordChallengeStep(0);
+      currentState = COLOR_WORD_CHALLENGE;
+    }
+    else if (key == '3')
+    {
+      colorWordStepDuration = colorWordDurations[HARD];
+      colorWordDifficulty = HARD;
+      // Prepare game
+      generateColorWordChallengeSequences(cwcSeq1, cwcSeq2, COLOR_WORD_CHALLENGE_LENGTH);
+      colorWordCurrentStep = 0;
+      colorWordWrongTries = 0;
+      colorWordStepStartTime = 0;
+      showColorWordChallengeStep(0);
+      currentState = COLOR_WORD_CHALLENGE;
+    }
+    break;
+  }
+
+  case COLOR_WORD_CHALLENGE:
+  {
+    unsigned long now = millis();
+    if (colorWordStepStartTime == 0)
+    {
+      colorWordStepStartTime = now;
+    }
+    // Allow menu/logout
+    if (key == '*')
+    {
+      showMenu();
+      currentState = MENU;
+      colorWordWrongTries = 0;
+      colorWordCurrentStep = 0;
+      break;
+    }
+    if (key == '#')
+    {
+      showModeSelect();
+      currentState = MODE_SELECT;
+      colorWordWrongTries = 0;
+      colorWordCurrentStep = 0;
       break;
     }
 
-    // Button input handling
+    // Start timer for each new word
+    if (colorWordStepStartTime == 0)
+    {
+      colorWordStepStartTime = now;
+    }
+
+    // Handle timeout: if 7 seconds pass, count as wrong and advance
+    if (now - colorWordStepStartTime >= colorWordStepDuration)
+    {
+      colorWordWrongTries++;
+      colorWordCurrentStep++;
+      colorWordStepStartTime = 0; // reset for next word
+
+      if (colorWordCurrentStep == COLOR_WORD_CHALLENGE_LENGTH)
+      {
+        int stars = colorWordMaxTries - colorWordWrongTries;
+        showCenteredStarsAndScore(stars);
+        delay(2000);
+        showMenu();
+        currentState = MENU;
+        colorWordWrongTries = 0;
+        colorWordCurrentStep = 0;
+        break;
+      }
+      else
+      {
+        showColorWordChallengeStep(colorWordCurrentStep);
+      }
+    }
+
+    // Handle button presses
     int buttonPins[3] = {RED_BUTTON_PIN, BLUE_BUTTON_PIN, GREEN_BUTTON_PIN};
     for (int i = 0; i < 3; i++)
     {
       int reading = digitalRead(buttonPins[i]);
-      if (lastButtonState[i] == HIGH && reading == LOW && (millis() - lastDebounceTime[i]) > debounceDelay)
+      if (lastButtonState[i] == HIGH && reading == LOW && (now - lastDebounceTime[i]) > debounceDelay)
       {
-        lastDebounceTime[i] = millis();
-        // The correct answer is the color in cwcSeq1[colorWordCurrentStep]
+        lastDebounceTime[i] = now;
+
         if (i == cwcSeq1[colorWordCurrentStep])
         {
-          // Correct!
+          // Correct: advance and award star (no need to increment wrongTries)
           colorWordCurrentStep++;
-          if (colorWordCurrentStep == COLOR_WORD_CHALLENGE_LENGTH)
-          {
-            // Game complete, show stars/score
-            int stars = colorWordMaxTries - colorWordWrongTries;
-            showCenteredStarsAndScore(stars);
-            delay(2000);
-            showMenu();
-            currentState = MENU;
-            colorWordWrongTries = 0;
-            colorWordCurrentStep = 0;
-            break;
-          }
-          else
-          {
-            showColorWordChallengeStep(colorWordCurrentStep);
-          }
         }
         else
         {
-          // Wrong!
+          // Wrong: advance, count as wrong, no retry
           colorWordWrongTries++;
-          // Optional: flash screen/message for wrong answer
-          display.fillScreen(WHITE);
-          display.setTextSize(2);
-          display.setTextColor(RED);
-          display.setCursor(40, 120);
-          display.print("Wrong!");
-          delay(1000);
+          colorWordCurrentStep++;
+        }
+        colorWordStepStartTime = 0; // reset timer for next word
+
+        if (colorWordCurrentStep == COLOR_WORD_CHALLENGE_LENGTH)
+        {
+          int stars = colorWordMaxTries - colorWordWrongTries;
+          showCenteredStarsAndScore(stars);
+          delay(2000);
+          showMenu();
+          currentState = MENU;
+          colorWordWrongTries = 0;
+          colorWordCurrentStep = 0;
+          break;
+        }
+        else
+        {
           showColorWordChallengeStep(colorWordCurrentStep);
         }
       }
@@ -1598,59 +1832,15 @@ void loop()
 
   case LED_REACTION:
   {
-    unsigned long now = millis();
+    static unsigned long ledStepStartTime = 0;
 
-    // End game if time is up
-    if (ledReactionActive && (now - ledReactionStartTime >= ledReactionGameDuration))
-    {
-      ledReactionActive = false;
-      turnOffAllRings();
-      display.fillScreen(WHITE);
-      display.setTextSize(2);
-      display.setTextColor(BLACK);
-
-      // Show coins
-      const char *msg = "Coins:";
-      int16_t x1, y1;
-      uint16_t w, h;
-      display.getTextBounds(msg, 0, 0, &x1, &y1, &w, &h);
-      int x = (SCREEN_WIDTH - w) / 2;
-      int y = 80;
-      display.setCursor(x, y);
-      display.print(msg);
-      String coinsStr = String(ledReactionCorrect);
-      display.getTextBounds(coinsStr.c_str(), 0, 0, &x1, &y1, &w, &h);
-      x = (SCREEN_WIDTH - w) / 2;
-      y += 30;
-      display.setCursor(x, y);
-      display.print(coinsStr);
-
-      // Show stars
-      int stars = ledReactionStars(ledReactionCorrect);
-      String starsStr = "Stars: ";
-      for (int i = 0; i < stars; i++)
-        starsStr += "* ";
-      display.setTextSize(2);
-      display.setTextColor(GREEN);
-      display.getTextBounds(starsStr.c_str(), 0, 0, &x1, &y1, &w, &h);
-      x = (SCREEN_WIDTH - w) / 2;
-      y += 50;
-      display.setCursor(x, y);
-      display.print(starsStr);
-
-      delay(2500);
-      showMenu();
-      currentState = MENU;
-      break;
-    }
-
-    // Allow exit to menu or logout
     if (key == '*')
     {
       turnOffAllRings();
       showMenu();
       currentState = MENU;
       ledReactionActive = false;
+      ledReactionWaiting = false;
       break;
     }
     if (key == '#')
@@ -1659,50 +1849,78 @@ void loop()
       showModeSelect();
       currentState = MODE_SELECT;
       ledReactionActive = false;
+      ledReactionWaiting = false;
       break;
     }
 
-    // If waiting between rounds, check if 1s has passed
+    if (!ledReactionActive)
+      break;
+
+    unsigned long now = millis();
+
+    // ----- Handle the white screen delay -----
     if (ledReactionWaiting)
     {
       if (now - ledReactionDelayStart >= ledReactionDelayDuration)
       {
-        // Generate and show new color
-        int newColor;
-        do
-        {
-          newColor = random(0, 3);
-        } while (newColor == ledReactionCurrentColor);
-        ledReactionCurrentColor = newColor;
-        showLedReactionColor(ledReactionCurrentColor);
+        // End of white screen, show next color
+        display.fillScreen(WHITE); // Optional: clear before next color
+        showNextLedReactionColor();
+        ledStepStartTime = now;
         ledReactionWaiting = false;
       }
-      break; // Don't process button input during the delay
+      break; // Don't process button/color logic during white screen
     }
 
-    // Button input handling (only if game is active and not waiting)
-    if (ledReactionActive)
+    // ----- Start step timer and show new color if needed -----
+    if (ledStepStartTime == 0)
     {
-      int buttonPins[3] = {RED_BUTTON_PIN, BLUE_BUTTON_PIN, GREEN_BUTTON_PIN};
-      for (int i = 0; i < 3; i++)
+      showNextLedReactionColor();
+      ledStepStartTime = now;
+    }
+
+    // ----- Check for button press -----
+    int buttonPins[3] = {RED_BUTTON_PIN, BLUE_BUTTON_PIN, GREEN_BUTTON_PIN};
+    for (int i = 0; i < 3; i++)
+    {
+      int reading = digitalRead(buttonPins[i]);
+      if (lastButtonState[i] == HIGH && reading == LOW && (now - lastDebounceTime[i]) > debounceDelay)
       {
-        int reading = digitalRead(buttonPins[i]);
-        if (lastButtonState[i] == HIGH && reading == LOW && (now - lastDebounceTime[i]) > debounceDelay)
+        lastDebounceTime[i] = now;
+        if (i == ledReactionCurrentColor)
         {
-          lastDebounceTime[i] = now;
-          // Check if correct
-          if (i == ledReactionCurrentColor)
-          {
-            ledReactionCorrect++;
-          }
-          // Start the 1s delay before next color
-          ledReactionWaiting = true;
-          ledReactionDelayStart = now;
-          turnOffAllRings();
-          display.fillScreen(WHITE); // Optionally blank the screen during the wait
+          ledReactionCorrect++; // Correct button
         }
-        lastButtonState[i] = reading;
+        // Move to white screen before next color
+        turnOffAllRings();
+        display.fillScreen(WHITE);
+        ledReactionWaiting = true;
+        ledReactionDelayStart = millis();
+        ledStepStartTime = 0; // Reset for next round
+        break;
       }
+      lastButtonState[i] = reading;
+    }
+
+    // ----- Timeout: move to white screen if time exceeded -----
+    if (!ledReactionWaiting && (now - ledStepStartTime >= ledReactionStepDuration))
+    {
+      turnOffAllRings();
+      display.fillScreen(WHITE);
+      ledReactionWaiting = true;
+      ledReactionDelayStart = millis();
+      ledStepStartTime = 0; // Reset for next round
+    }
+
+    // ----- End game after 20 seconds -----
+    if (now - ledReactionStartTime >= ledReactionGameDuration)
+    {
+      ledReactionActive = false;
+      turnOffAllRings();
+      showLedReactionScore(ledReactionCorrect); // Show score
+      showMenu();
+      currentState = MENU;
+      ledReactionWaiting = false;
     }
     break;
   }
