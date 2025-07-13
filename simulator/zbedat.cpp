@@ -646,8 +646,8 @@ void showPlayerSelected(byte player)
   display.setCursor((SCREEN_WIDTH - w) / 2 + 10, 60);
   display.print(welcomeMsg);
 
-  // --- Player name, centered below banner ---
-  display.setTextSize(2);
+  // --- Player name, centered below banner, "bold" effect ---
+  display.setTextSize(3); // Make it big for emphasis
   display.setTextColor(BLACK);
   String name;
   if (player >= 1 && player <= playerCount)
@@ -655,11 +655,16 @@ void showPlayerSelected(byte player)
   else
     name = "Unknown Player";
   display.getTextBounds(name.c_str(), 0, 0, &x1, &y1, &w, &h);
-  display.setCursor((SCREEN_WIDTH - w) / 2, 120);
-  display.print(name);
+  int nameX = (SCREEN_WIDTH - w) / 2;
+  int nameY = 120;
 
-  // --- Optional: Add a smiley face or icon next to name ---
-  // display.fillCircle((SCREEN_WIDTH + w) / 2 + 18, 130, 8, 0xFFE0); // Yellow smiley
+  // Fake bold: print name twice, slightly offset
+  display.setTextColor(DARKGREY);
+  display.setCursor(nameX + 1, nameY + 1);
+  display.print(name);
+  display.setTextColor(BLACK);
+  display.setCursor(nameX, nameY);
+  display.print(name);
 
   delay(1200);
 }
@@ -757,8 +762,8 @@ void showMultiplayerMenu() {
   int btnX = (SCREEN_WIDTH - btnW) / 2;
   int btnY = 120;
 
-  // --- Button color (blue) ---
-  uint16_t btnColor = 0x3A99; // Soft blue
+  // --- Button color (green for multiplayer) ---
+  uint16_t btnColor = 0x07E0; // Green
   display.fillRoundRect(btnX, btnY, btnW, btnH, radius, btnColor);
 
   // --- Multiplayer icon (two heads) ---
@@ -769,7 +774,7 @@ void showMultiplayerMenu() {
   display.fillRoundRect(iconX1 - 10, iconY1 + 10, 20, 10, 5, WHITE); // Body 1
   display.fillRoundRect(iconX2 - 10, iconY2 + 10, 20, 10, 5, WHITE); // Body 2
 
-  // --- Button label ---
+  // --- Button label (two lines) ---
   display.setTextSize(2);
   display.setTextColor(WHITE);
   int labelX = btnX + 90;
