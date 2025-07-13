@@ -208,6 +208,7 @@ const char *collection = "users";
 std::vector<String> playerNames;
 int playerCount = 0;  // Will be updated after fetching
 int maxToShow = 0;
+int playerDisplayOffset = 0;  // For paging through playerNames
 
 // Game variables for number of tries
 int codeBreakerWrongTries = 0;
@@ -453,10 +454,12 @@ void showMultiplayerPlayerSelect1() {
   display.setCursor(20, 60);
   display.print("Choose Player 1:");
   int y = 100;
-  for (int i = 0; i < maxToShow; i++) {
+  int shown = 0;
+  for (int i = playerDisplayOffset; i < playerNames.size() && shown < 4; i++) {
     display.setCursor(20, y);
     display.print(String(i + 1) + ") " + playerNames[i]);
     y += 30;
+    ++shown;
   }
   // --- Add this for # logout at bottom right ---
   const char *logoutText = "# logout";
@@ -477,13 +480,15 @@ void showMultiplayerPlayerSelect2(byte excludeIndex) {
   display.print("Choose Player 2:");
   int y = 100;
   int optionNum = 1;
-  for (int i = 0; i < maxToShow; i++) {
+  int shown = 0;
+  for (int i = playerDisplayOffset; i < playerNames.size() && shown < 4; i++) {
     if (i == excludeIndex)
       continue;  // skip the chosen player
     display.setCursor(20, y);
     display.print(String(optionNum) + ") " + playerNames[i]);
     y += 30;
     optionNum++;
+    ++shown;
   }
   // --- Add this for # logout at bottom right ---
   const char *logoutText = "# logout";
@@ -522,8 +527,11 @@ void showPlayerSelected(byte player) {
   display.print("Welcome back :)");
   display.setCursor(20, 140);
   // player is 1-based, array is 0-based
-  if (player >= 1 && player <= maxToShow) {
-    display.print(playerNames[player - 1]);
+  int actualIndex = playerDisplayOffset + (player - 1);
+  Serial.println(actualIndex);
+  Serial.println(player);
+  if (player >= 1 && player < playerNames.size()) {
+    display.print(playerNames[player]);
   } else {
     display.print("Unknown Player");
   }
@@ -816,10 +824,12 @@ void showPlayerMenu() {
   display.setCursor(20, 60);
   display.print("Select player:");
   int y = 100;
+  int shown = 0;
   for (int i = 0; i < maxToShow; i++) {
     display.setCursor(20, y);
-    display.print(String(i + 1) + ") " + playerNames[i]);
+    display.print(String(i + 1) + ") " + playerNames[playerDisplayOffset + i]);
     y += 30;
+    ++shown;
   }
 
   // --- Add this for # logout at bottom right ---
@@ -1128,11 +1138,15 @@ void loop() {
         }
 
         if (key && key >= '1' && key <= '0' + maxToShow) {
-          multiplayerPlayer1 = key - '0';                        // 1-based index
-          showMultiplayerPlayerSelect2(multiplayerPlayer1 - 1);  // Pass 0-based index to exclude
-          currentState = PLAYER2_SELECT;
-          delay(150);
-          while (keypad.getKey() != NO_KEY) {
+          int selection = key - '1';  // 0-based index for button pressed (0,1,2,3)
+          int actualIndex = playerDisplayOffset + selection;
+          if (actualIndex < playerNames.size()) {
+            multiplayerPlayer1 = actualIndex + 1;       // 1-based index for player
+            showMultiplayerPlayerSelect2(actualIndex);  // Pass 0-based index to exclude
+            currentState = PLAYER2_SELECT;
+            delay(150);
+            while (keypad.getKey() != NO_KEY) {
+            }
           }
         }
         break;
@@ -1146,15 +1160,15 @@ void loop() {
           return;  // or break; if not in a function
         }
 
-        if (key && key >= '1' && key <= '0' + (maxToShow - 1)) {
-          // Map the key to the correct player index, skipping the excluded one
-          int option = key - '1';                // 0-based option
+        if (key && key >= '1' && key <= '0' + maxToShow) {
+          int option = key - '1';                // 0-based option (0,1,2,3)
           int exclude = multiplayerPlayer1 - 1;  // 0-based index to skip
           int chosenIdx = -1;
           int count = 0;
-          for (int i = 0; i < maxToShow; i++) {
+          // Loop through the currently displayed players
+          for (int i = playerDisplayOffset; i < playerNames.size() && count < maxToShow; i++) {
             if (i == exclude)
-              continue;
+              continue;  // skip the chosen player
             if (count == option) {
               chosenIdx = i;
               break;
@@ -1410,17 +1424,30 @@ void loop() {
 
     case PLAYER_SELECT:
       {
+        if (key == '9') {
+          if (playerDisplayOffset + 4 < playerNames.size()) {
+            playerDisplayOffset += 4;
+            // Redraw the selection menu with new offset
+            showPlayerMenu();
+          }
+          break;
+        }
         if (key == '#') {
           showModeSelect();
           currentState = MODE_SELECT;
           return;
         }
 
-        if (key && key >= '1' && key <= '4' && key - '0' <= maxToShow) {
-          currentPlayer = key - '0';
-          showPlayerSelected(currentPlayer);
-          showMenu();
-          currentState = MENU;
+        if (key && key >= '1' && key <= '4' && (key - '0') <= maxToShow) {
+          int selection = key - '1';  // 0-based index for key pressed (0 for '1', 1 for '2', etc.)
+          int actualIndex = playerDisplayOffset + selection;
+          if (actualIndex < playerNames.size()) {
+            currentPlayer = actualIndex;    // 1-based index if you want, or just use actualIndex
+            showPlayerSelected(currentPlayer);  // Pass actualIndex+1 or actualIndex as needed
+            showMenu();
+            currentState = MENU;
+            playerDisplayOffset = 0;
+          }
         }
         break;
       }
