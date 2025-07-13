@@ -455,9 +455,10 @@ void showMultiplayerPlayerSelect1() {
   display.print("Choose Player 1:");
   int y = 100;
   int shown = 0;
-  for (int i = playerDisplayOffset; i < playerNames.size() && shown < 4; i++) {
+  // for (int i = playerDisplayOffset; i < playerNames.size() && shown < 4; i++) {
+  for (int i = 0; i < maxToShow; i++) {
     display.setCursor(20, y);
-    display.print(String(i + 1) + ") " + playerNames[i]);
+    display.print(String(i + 1) + ") " + playerNames[playerDisplayOffset + i]);
     y += 30;
     ++shown;
   }
@@ -1131,6 +1132,13 @@ void loop() {
 
     case PLAYER1_SELECT:
       {
+        if (key == '9') {
+          if (playerDisplayOffset + 4 < playerNames.size()) {
+            playerDisplayOffset += 4;
+            showMultiplayerPlayerSelect1();
+          }
+          break;
+        }
         if (key == '#') {
           showModeSelect();
           currentState = MODE_SELECT;
@@ -1141,8 +1149,9 @@ void loop() {
           int selection = key - '1';  // 0-based index for button pressed (0,1,2,3)
           int actualIndex = playerDisplayOffset + selection;
           if (actualIndex < playerNames.size()) {
-            multiplayerPlayer1 = actualIndex + 1;       // 1-based index for player
-            showMultiplayerPlayerSelect2(actualIndex);  // Pass 0-based index to exclude
+            multiplayerPlayer1 = actualIndex;                  // 0-based index for player
+            playerDisplayOffset = 0; // Reset for next selection
+            showMultiplayerPlayerSelect2(multiplayerPlayer1);  // Pass 0-based index to exclude
             currentState = PLAYER2_SELECT;
             delay(150);
             while (keypad.getKey() != NO_KEY) {
@@ -1154,6 +1163,13 @@ void loop() {
 
     case PLAYER2_SELECT:
       {
+        if (key == '9') {
+          if (playerDisplayOffset + 4 < playerNames.size()) {
+            playerDisplayOffset += 4;
+            showMultiplayerPlayerSelect2(multiplayerPlayer1);
+          }
+          break;
+        }
         if (key == '#') {
           showModeSelect();
           currentState = MODE_SELECT;
@@ -1162,7 +1178,7 @@ void loop() {
 
         if (key && key >= '1' && key <= '0' + maxToShow) {
           int option = key - '1';                // 0-based option (0,1,2,3)
-          int exclude = multiplayerPlayer1 - 1;  // 0-based index to skip
+          int exclude = multiplayerPlayer1;  // 0-based index to skip
           int chosenIdx = -1;
           int count = 0;
           // Loop through the currently displayed players
@@ -1176,13 +1192,14 @@ void loop() {
             count++;
           }
           if (chosenIdx != -1) {
-            multiplayerPlayer2 = chosenIdx + 1;  // Store as 1-based
+            multiplayerPlayer2 = chosenIdx;
             showMultiplayerMenu();
             currentState = MULTI_MENU;
             delay(150);
             while (keypad.getKey() != NO_KEY) {
             }
           }
+          playerDisplayOffset = 0; // Reset for next selection
         }
         break;
       }
@@ -1442,7 +1459,7 @@ void loop() {
           int selection = key - '1';  // 0-based index for key pressed (0 for '1', 1 for '2', etc.)
           int actualIndex = playerDisplayOffset + selection;
           if (actualIndex < playerNames.size()) {
-            currentPlayer = actualIndex;    // 1-based index if you want, or just use actualIndex
+            currentPlayer = actualIndex;        // 1-based index if you want, or just use actualIndex
             showPlayerSelected(currentPlayer);  // Pass actualIndex+1 or actualIndex as needed
             showMenu();
             currentState = MENU;
