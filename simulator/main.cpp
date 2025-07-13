@@ -1140,6 +1140,7 @@ void loop() {
           break;
         }
         if (key == '#') {
+          playerDisplayOffset = 0;  // <-- Reset the offset!
           showModeSelect();
           currentState = MODE_SELECT;
           return;
@@ -1171,6 +1172,7 @@ void loop() {
           break;
         }
         if (key == '#') {
+          playerDisplayOffset = 0;  // <-- Reset the offset!
           showModeSelect();
           currentState = MODE_SELECT;
           return;  // or break; if not in a function
@@ -1199,7 +1201,6 @@ void loop() {
             while (keypad.getKey() != NO_KEY) {
             }
           }
-          playerDisplayOffset = 0; // Reset for next selection
         }
         break;
       }
@@ -1207,6 +1208,7 @@ void loop() {
     case MULTI_MENU:
       {
         if (key == '#') {
+          playerDisplayOffset = 0;  // <-- Reset the offset!
           showModeSelect();
           currentState = MODE_SELECT;
           return;  // or break; if not in a function
@@ -1450,6 +1452,7 @@ void loop() {
           break;
         }
         if (key == '#') {
+          playerDisplayOffset = 0;  // <-- Reset the offset!
           showModeSelect();
           currentState = MODE_SELECT;
           return;
@@ -1474,6 +1477,7 @@ void loop() {
       {
         if (key) {
           if (key == '#') {
+            playerDisplayOffset = 0;  // <-- Reset the offset!
             showModeSelect();
             currentState = MODE_SELECT;
             codeBreakerWrongTries = 0;
@@ -1500,6 +1504,7 @@ void loop() {
               break;
             }
             if (key == '#') {
+              playerDisplayOffset = 0;  // <-- Reset the offset!
               showModeSelect();
               currentState = MODE_SELECT;
               codeBreakerWrongTries = 0;
@@ -1538,6 +1543,7 @@ void loop() {
             break;
           }
           if (key == '#') {
+            playerDisplayOffset = 0;  // <-- Reset the offset!
             showModeSelect();
             currentState = MODE_SELECT;
             codeBreakerWrongTries = 0;
@@ -1597,6 +1603,7 @@ void loop() {
           break;
         }
         if (key == '#') {
+          playerDisplayOffset = 0;  // <-- Reset the offset!
           showModeSelect();
           currentState = MODE_SELECT;
           codeBreakerWrongTries = 0;
@@ -1675,6 +1682,7 @@ void loop() {
           break;
         }
         if (key == '#') {
+          playerDisplayOffset = 0;  // <-- Reset the offset!
           showModeSelect();
           currentState = MODE_SELECT;
           colorWordWrongTries = 0;
@@ -1725,6 +1733,7 @@ void loop() {
           break;
         }
         if (key == '#') {
+          playerDisplayOffset = 0;  // <-- Reset the offset!
           showModeSelect();
           currentState = MODE_SELECT;
           colorWordWrongTries = 0;
@@ -1780,6 +1789,7 @@ void loop() {
           break;
         }
         if (key == '#') {
+          playerDisplayOffset = 0;  // <-- Reset the offset!
           showModeSelect();
           currentState = MODE_SELECT;
           colorWordWrongTries = 0;
@@ -1860,6 +1870,7 @@ void loop() {
           break;
         }
         if (key == '#') {
+          playerDisplayOffset = 0;  // <-- Reset the offset!
           turnOffAllRings();
           showModeSelect();
           currentState = MODE_SELECT;
@@ -1944,6 +1955,7 @@ void loop() {
             break;
           }
           if (key == '#') {
+            playerDisplayOffset = 0;  // <-- Reset the offset!
             showModeSelect();
             currentState = MODE_SELECT;
             codeBreakerWrongTries = 0;
@@ -1997,6 +2009,7 @@ void loop() {
             break;
           }
           if (key == '#') {
+            playerDisplayOffset = 0;  // <-- Reset the offset!
             showModeSelect();
             currentState = MODE_SELECT;
             codeBreakerWrongTries = 0;
