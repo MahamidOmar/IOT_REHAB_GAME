@@ -225,6 +225,8 @@ void showLedReactionScore(int score)
   delay(2000); // Show for 2 seconds
 }
 
+
+///zbedat
 void showLedReactionDifficultySelect() {
   display.fillScreen(WHITE);
 
@@ -280,6 +282,7 @@ void showLedReactionDifficultySelect() {
 }
 
 
+///zbedat
 void showColorWordDifficultySelect() {
   display.fillScreen(WHITE);
 
@@ -616,6 +619,9 @@ void showNextLedReactionColor()
   display.fillScreen(colorValues[ledReactionCurrentColor]);
 }
 
+
+
+///zbedat
 void showPlayerSelected(byte player)
 {
   display.fillScreen(WHITE);
@@ -662,6 +668,9 @@ void showPlayerSelected(byte player)
 // No custom font includes are needed for this version.
 // Remove any #include <Fonts/Free...> lines you may have added for this function.
 
+
+
+///zbedat
 void showMenu() {
   display.fillScreen(WHITE);
   display.setFont();      // Use default font
@@ -739,7 +748,7 @@ void showMenu() {
 
 
 
-
+///zbedat
 void showMultiplayerMenu() {
   display.fillScreen(WHITE);
 
@@ -869,6 +878,8 @@ void showLastTry(const char *guess)
   display.print("Last try: ");
   display.print(guess);
 }
+
+///zbedat
 void showCodeBreakerDifficultyMenu() {
   display.fillScreen(WHITE);
 
@@ -939,6 +950,8 @@ void showCodeBreakerTitle()
 }
 // Show the difficulty selection screen for Visual Memory
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+///zbedat
 void showVisualMemoryDifficultyMenu() {
   display.fillScreen(WHITE);
 
@@ -1428,6 +1441,59 @@ void setup()
   pinMode(GREEN_BUTTON_PIN, INPUT_PULLUP);
 }
 
+
+///zbedat
+void showRivalryScreen(byte player1, byte player2)
+{
+  display.fillScreen(WHITE);
+
+  // --- Colors ---
+  uint16_t p1Color = 0x3A99; // Blue
+  uint16_t p2Color = 0xFD20; // Orange
+
+  // --- Player 1 box and icon ---
+  int boxW = 90, boxH = 90;
+  int boxY = (SCREEN_HEIGHT - boxH) / 2;
+  int box1X = 24;
+  display.fillRoundRect(box1X, boxY, boxW, boxH, 18, p1Color);
+  int icon1X = box1X + boxW/2, icon1Y = boxY + 30;
+  display.fillCircle(icon1X, icon1Y, 18, WHITE); // Head
+  display.fillRoundRect(icon1X - 18, icon1Y + 12, 36, 18, 9, WHITE); // Shoulders
+
+  // Player 1 name, centered in box
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  String name1 = (player1 >= 1 && player1 <= playerCount) ? playerNames[player1-1] : "Player 1";
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(name1.c_str(), 0, 0, &x1, &y1, &w, &h);
+  display.setCursor(box1X + (boxW - w)/2, boxY + boxH - 22);
+  display.print(name1);
+
+  // --- Player 2 box and icon ---
+  int box2X = SCREEN_WIDTH - boxW - 24;
+  display.fillRoundRect(box2X, boxY, boxW, boxH, 18, p2Color);
+  int icon2X = box2X + boxW/2, icon2Y = boxY + 30;
+  display.fillCircle(icon2X, icon2Y, 18, WHITE); // Head
+  display.fillRoundRect(icon2X - 18, icon2Y + 12, 36, 18, 9, WHITE); // Shoulders
+
+  // Player 2 name, centered in box
+  String name2 = (player2 >= 1 && player2 <= playerCount) ? playerNames[player2-1] : "Player 2";
+  display.getTextBounds(name2.c_str(), 0, 0, &x1, &y1, &w, &h);
+  display.setCursor(box2X + (boxW - w)/2, boxY + boxH - 22);
+  display.print(name2);
+
+  // --- VS in the center ---
+  display.setTextSize(4);
+  display.setTextColor(DARKGREY);
+  const char* vsText = "VS";
+  display.getTextBounds(vsText, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor((SCREEN_WIDTH - w)/2, boxY + (boxH - h)/2 + 8);
+  display.print(vsText);
+
+  delay(1200); // Show for 1.2 seconds
+}
+
 void loop()
 {
   char key = keypad.getKey();
@@ -1507,7 +1573,10 @@ void loop()
       }
       if (chosenIdx != -1)
       {
+        ///zbedat
         multiplayerPlayer2 = chosenIdx + 1; // Store as 1-based
+        showRivalryScreen(multiplayerPlayer1, multiplayerPlayer2);
+
         showMultiplayerMenu();
         currentState = MULTI_MENU;
         delay(150);
