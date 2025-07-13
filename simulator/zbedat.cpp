@@ -6,7 +6,20 @@
 #include <Adafruit_NeoPixel.h>
 #include "esp_wpa2.h" // Only needed for WPA2-Enterprise
 
+
+
+#include <Fonts/FreeSans9pt7b.h>
+
+
 unsigned long colorWordStepStartTime = 0;
+enum CodeBreakerDifficulty
+{
+  CB_EASY,
+  CB_MEDIUM,
+  CB_HARD
+};
+CodeBreakerDifficulty codeBreakerDifficulty = CB_EASY; // Default
+int codeBreakerMaxTries = 12;
 enum LedReactionDifficulty
 {
   LED_EASY,
@@ -161,6 +174,8 @@ enum State
   CODE_BREAKER,
   COLOR_WORD_DIFFICULTY_SELECT,
   COLOR_WORD_CHALLENGE,
+  CODE_BREAKER_DIFFICULTY_SELECT, // For single player Code Breaker difficulty menu
+  VISUAL_MEMORY_DIFFICULTY_SELECT,
   VISUAL_MEMORY,
   VISUAL_MEMORY_INPUT,
   VISUAL_MEMORY_RESULT,
@@ -191,7 +206,9 @@ int playerCount = MAX_PLAYERS;
 // Game variables for number of tries
 int codeBreakerWrongTries = 0;
 int visualMemoryWrongTries = 0;
-const int maxWrongTries = 5;
+int maxWrongTries = 5;
+int maxWrongTries_VM = 3; // For Visual Memory game
+
 void showLedReactionScore(int score)
 {
   display.fillScreen(WHITE);
@@ -208,35 +225,116 @@ void showLedReactionScore(int score)
   delay(2000); // Show for 2 seconds
 }
 
-void showLedReactionDifficultySelect()
-{
+void showLedReactionDifficultySelect() {
   display.fillScreen(WHITE);
+
+  // Bigger buttons
+  int btnW = 200, btnH = 64, radius = 16;
+  int btnX = 20, btnY1 = 60, btnY2 = 150, btnY3 = 240;
+
+  // --- Easy: Green button, big smiley face icon ---
+  display.fillRoundRect(btnX, btnY1, btnW, btnH, radius, GREEN);
+  int ex = btnX + 32, ey = btnY1 + btnH/2;
+  display.fillCircle(ex, ey, 14, WHITE); // Face
+  display.fillCircle(ex - 6, ey - 4, 2, BLACK); // Left eye
+  display.fillCircle(ex + 6, ey - 4, 2, BLACK); // Right eye
+  display.drawArc(ex, ey + 4, 7, 7, 30, 150, BLACK); // Smile
+  display.setTextColor(WHITE);
   display.setTextSize(2);
-  display.setTextColor(BLACK);
-  display.setCursor(40, 60);
-  display.print("Select Difficulty:");
-  display.setCursor(40, 100);
-  display.print("1. Easy (2s)");
-  display.setCursor(40, 140);
-  display.print("2. Medium (1s)");
-  display.setCursor(40, 180);
-  display.print("3. Hard (0.5s)");
+  int easyTextX = btnX + 80;
+  int easyTextY = btnY1 + 18;
+  display.setCursor(easyTextX, easyTextY);
+  display.print("Easy");
+  display.setCursor(easyTextX, easyTextY + 28);
+  display.print("2s");
+
+  // --- Medium: Yellow button, big lightning bolt ---
+  uint16_t yellow = 0xFFE0;
+  display.fillRoundRect(btnX, btnY2, btnW, btnH, radius, yellow);
+  int bx = btnX + 32, by = btnY2 + btnH/2 - 8;
+  display.drawLine(bx, by, bx + 12, by + 24, BLACK);           // Top
+  display.drawLine(bx + 12, by + 24, bx - 6, by + 24, BLACK);  // Middle
+  display.drawLine(bx - 6, by + 24, bx + 4, by + 44, BLACK);   // Bottom
+  display.setTextColor(WHITE);
+  display.setTextSize(2);
+  int medTextX = btnX + 80;
+  int medTextY = btnY2 + 18;
+  display.setCursor(medTextX, medTextY);
+  display.print("Medium");
+  display.setCursor(medTextX, medTextY + 28);
+  display.print("1s");
+
+  // --- Hard: Red button, big flame icon ---
+  display.fillRoundRect(btnX, btnY3, btnW, btnH, radius, RED);
+  int fx = btnX + 32, fy = btnY3 + btnH/2 + 8;
+  display.fillTriangle(fx, fy - 24, fx - 16, fy + 16, fx + 16, fy + 16, ORANGE); // Big flame
+  display.fillCircle(fx, fy - 4, 8, YELLOW); // Big flame core
+  display.setTextColor(WHITE);
+  display.setTextSize(2);
+  int hardTextX = btnX + 80;
+  int hardTextY = btnY3 + 18;
+  display.setCursor(hardTextX, hardTextY);
+  display.print("Hard");
+  display.setCursor(hardTextX, hardTextY + 28);
+  display.print("0.5s");
 }
 
-void showColorWordDifficultySelect()
-{
+
+void showColorWordDifficultySelect() {
   display.fillScreen(WHITE);
+
+  // Bigger buttons
+  int btnW = 200, btnH = 64, radius = 16;
+  int btnX = 20, btnY1 = 60, btnY2 = 150, btnY3 = 240;
+
+  // --- Easy: Green button, big smiley face icon ---
+  display.fillRoundRect(btnX, btnY1, btnW, btnH, radius, GREEN);
+  int ex = btnX + 32, ey = btnY1 + btnH/2;
+  display.fillCircle(ex, ey, 14, WHITE); // Face
+  display.fillCircle(ex - 6, ey - 4, 2, BLACK); // Left eye
+  display.fillCircle(ex + 6, ey - 4, 2, BLACK); // Right eye
+  display.drawArc(ex, ey + 4, 7, 7, 30, 150, BLACK); // Smile
+  display.setTextColor(WHITE);
   display.setTextSize(2);
-  display.setTextColor(BLACK);
-  display.setCursor(40, 60);
-  display.print("Select Difficulty:");
-  display.setCursor(40, 100);
-  display.print("1. Easy (7s)");
-  display.setCursor(40, 140);
-  display.print("2. Medium (4s)");
-  display.setCursor(40, 180);
-  display.print("3. Hard (2s)");
+  int easyTextX = btnX + 80;
+  int easyTextY = btnY1 + 18;
+  display.setCursor(easyTextX, easyTextY);
+  display.print("Easy");
+  display.setCursor(easyTextX, easyTextY + 28);
+  display.print("7s");
+
+  // --- Medium: Yellow button, big lightning bolt ---
+  uint16_t yellow = 0xFFE0;
+  display.fillRoundRect(btnX, btnY2, btnW, btnH, radius, yellow);
+  int bx = btnX + 32, by = btnY2 + btnH/2 - 8;
+  display.drawLine(bx, by, bx + 12, by + 24, BLACK);           // Top
+  display.drawLine(bx + 12, by + 24, bx - 6, by + 24, BLACK);  // Middle
+  display.drawLine(bx - 6, by + 24, bx + 4, by + 44, BLACK);   // Bottom
+  display.setTextColor(WHITE);
+  display.setTextSize(2);
+  int medTextX = btnX + 80;
+  int medTextY = btnY2 + 18;
+  display.setCursor(medTextX, medTextY);
+  display.print("Medium");
+  display.setCursor(medTextX, medTextY + 28);
+  display.print("4s");
+
+  // --- Hard: Red button, big flame icon ---
+  display.fillRoundRect(btnX, btnY3, btnW, btnH, radius, RED);
+  int fx = btnX + 32, fy = btnY3 + btnH/2 + 8;
+  display.fillTriangle(fx, fy - 24, fx - 16, fy + 16, fx + 16, fy + 16, ORANGE); // Big flame
+  display.fillCircle(fx, fy - 4, 8, YELLOW); // Big flame core
+  display.setTextColor(WHITE);
+  display.setTextSize(2);
+  int hardTextX = btnX + 80;
+  int hardTextY = btnY3 + 18;
+  display.setCursor(hardTextX, hardTextY);
+  display.print("Hard");
+  display.setCursor(hardTextX, hardTextY + 28);
+  display.print("2s");
 }
+
+
 
 void showColorOnRings(int colorIndex)
 {
@@ -459,6 +557,15 @@ void showMultiplayerPlayerSelect1()
     display.print(String(i + 1) + ") " + playerNames[i]);
     y += 30;
   }
+  // --- Add this for # logout at bottom right ---
+  const char *logoutText = "# logout";
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.setTextSize(1);
+  display.setTextColor(DARKGREY);
+  display.getTextBounds(logoutText, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor(SCREEN_WIDTH - w, SCREEN_HEIGHT - 10);
+  display.print(logoutText);
 }
 
 void showMultiplayerPlayerSelect2(byte excludeIndex)
@@ -479,6 +586,15 @@ void showMultiplayerPlayerSelect2(byte excludeIndex)
     y += 30;
     optionNum++;
   }
+  // --- Add this for # logout at bottom right ---
+  const char *logoutText = "# logout";
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.setTextSize(1);
+  display.setTextColor(DARKGREY);
+  display.getTextBounds(logoutText, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor(SCREEN_WIDTH - w, SCREEN_HEIGHT - 10);
+  display.print(logoutText);
 }
 
 void showNextLedReactionColor()
@@ -503,59 +619,177 @@ void showNextLedReactionColor()
 void showPlayerSelected(byte player)
 {
   display.fillScreen(WHITE);
-  display.setTextColor(BLACK);
+
+  // --- Draw a colored welcome banner ---
+  uint16_t bannerColor = 0x3A99; // Soft blue
+  int bannerH = 56;
+  display.fillRoundRect(0, 40, SCREEN_WIDTH, bannerH, 12, bannerColor);
+
+  // --- Draw a user icon (left of the banner) ---
+  int iconX = 38, iconY = 68;
+  display.fillCircle(iconX, iconY, 18, WHITE);                       // Head
+  display.fillRoundRect(iconX - 18, iconY + 12, 36, 18, 9, WHITE);   // Shoulders
+
+  // --- Welcome text, centered in the banner ---
   display.setTextSize(2);
-  display.setCursor(20, 100);
-  display.print("Welcome back :)");
-  display.setCursor(20, 140);
-  // player is 1-based, array is 0-based
+  display.setTextColor(WHITE);
+  const char* welcomeMsg = "Welcome back";
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(welcomeMsg, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor((SCREEN_WIDTH - w) / 2 + 10, 60);
+  display.print(welcomeMsg);
+
+  // --- Player name, centered below banner ---
+  display.setTextSize(2);
+  display.setTextColor(BLACK);
+  String name;
   if (player >= 1 && player <= playerCount)
-  {
-    display.print(playerNames[player - 1]);
-  }
+    name = playerNames[player - 1];
   else
-  {
-    display.print("Unknown Player");
-  }
+    name = "Unknown Player";
+  display.getTextBounds(name.c_str(), 0, 0, &x1, &y1, &w, &h);
+  display.setCursor((SCREEN_WIDTH - w) / 2, 120);
+  display.print(name);
+
+  // --- Optional: Add a smiley face or icon next to name ---
+  // display.fillCircle((SCREEN_WIDTH + w) / 2 + 18, 130, 8, 0xFFE0); // Yellow smiley
+
   delay(1200);
 }
 
-// Show single player games menu
-void showMenu()
-{
+
+// No custom font includes are needed for this version.
+// Remove any #include <Fonts/Free...> lines you may have added for this function.
+
+void showMenu() {
   display.fillScreen(WHITE);
-  display.setTextColor(BLACK);
-  display.setTextSize(2);
-  int y = 40;
-  display.setCursor(20, y);
-  display.print("Choose your game:");
-  y += 40;
-  display.setCursor(20, y);
-  display.print("1) Code breaker");
-  y += 30;
-  display.setCursor(20, y);
-  display.print("2) Visual memory");
-  y += 30;
-  display.setCursor(20, y);
-  display.print("3) Color Word");
-  y += 30;
-  display.setCursor(20, y);
-  display.print("4) Led Reaction");
+  display.setFont();      // Use default font
+  display.setTextSize(2); // Size 2 for clear, readable text
+
+  // Button and icon layout
+  int btnW = 170, btnH = 54, radius = 12;
+  int btnX = 54;
+  int iconX = 20;
+  int y1 = 40, y2 = 110, y3 = 180, y4 = 250;
+
+  // --- Code Breaker ---
+  uint16_t cbColor = 0x3A99; // Soft blue
+  display.fillRoundRect(btnX, y1, btnW, btnH, radius, cbColor);
+  // Icon (lock)
+  int lockX = iconX + 8, lockY = y1 + btnH/2;
+  display.fillRect(lockX - 5, lockY - 5, 10, 8, cbColor);
+  display.drawArc(lockX - 1, lockY - 13, 5, 5, 210, 360, cbColor);
+  display.drawLine(lockX + 1, lockY - 13, lockX + 1, lockY - 5, cbColor);
+  display.setTextColor(WHITE);
+  display.setCursor(btnX + 48, y1 + 18); // First word
+  display.print("Code");
+  display.setCursor(btnX + 48, y1 + 38); // Second word, below
+  display.print("Breaker");
+
+  // --- Visual Memory ---
+  uint16_t vmColor = 0x07E0; // Green
+  display.fillRoundRect(btnX, y2, btnW, btnH, radius, vmColor);
+  int eyeX = iconX + 8, eyeY = y2 + btnH/2;
+  display.drawEllipse(eyeX, eyeY, 6, 3, vmColor);
+  display.fillCircle(eyeX, eyeY, 2, BLACK);
+  display.setTextColor(WHITE);
+  display.setCursor(btnX + 48, y2 + 18);
+  display.print("Visual");
+  display.setCursor(btnX + 48, y2 + 38);
+  display.print("Memory");
+
+  // --- Color Word ---
+  uint16_t cwcColor = 0xFD20; // Orange
+  display.fillRoundRect(btnX, y3, btnW, btnH, radius, cwcColor);
+  int palX = iconX + 8, palY = y3 + btnH/2;
+  display.fillCircle(palX, palY, 4, cwcColor);
+  display.fillCircle(palX - 2, palY - 2, 1, RED);
+  display.fillCircle(palX + 2, palY - 1, 1, BLUE);
+  display.fillCircle(palX, palY + 2, 1, GREEN);
+  display.setTextColor(WHITE);
+  display.setCursor(btnX + 48, y3 + 18);
+  display.print("Color");
+  display.setCursor(btnX + 48, y3 + 38);
+  display.print("Word");
+
+  // --- Led Reaction ---
+  uint16_t lrColor = 0xFFE0; // Yellow
+  display.fillRoundRect(btnX, y4, btnW, btnH, radius, lrColor);
+  int boltX = iconX + 8, boltY = y4 + btnH/2 - 4;
+  display.drawLine(boltX, boltY, boltX + 4, boltY + 8, lrColor);
+  display.drawLine(boltX + 4, boltY + 8, boltX - 2, boltY + 8, lrColor);
+  display.drawLine(boltX - 2, boltY + 8, boltX + 1, boltY + 14, lrColor);
+  display.setTextColor(WHITE);
+  display.setCursor(btnX + 48, y4 + 18);
+  display.print("Led");
+  display.setCursor(btnX + 48, y4 + 38);
+  display.print("Reaction");
+
+  // --- Shortcut hint at bottom ---
   showBottomHints();
 }
 
-// Show multiplayer games menu
-void showMultiplayerMenu()
-{
+
+
+
+
+
+
+
+
+
+
+void showMultiplayerMenu() {
   display.fillScreen(WHITE);
-  display.setTextColor(BLACK);
+
+  // --- Button dimensions and position ---
+  int btnW = 200, btnH = 64, radius = 16;
+  int btnX = (SCREEN_WIDTH - btnW) / 2;
+  int btnY = 120;
+
+  // --- Button color (blue) ---
+  uint16_t btnColor = 0x3A99; // Soft blue
+  display.fillRoundRect(btnX, btnY, btnW, btnH, radius, btnColor);
+
+  // --- Multiplayer icon (two heads) ---
+  int iconX1 = btnX + 38, iconY1 = btnY + btnH / 2 - 6;
+  int iconX2 = btnX + 58, iconY2 = btnY + btnH / 2 + 6;
+  display.fillCircle(iconX1, iconY1, 10, WHITE);                   // Head 1
+  display.fillCircle(iconX2, iconY2, 10, WHITE);                   // Head 2
+  display.fillRoundRect(iconX1 - 10, iconY1 + 10, 20, 10, 5, WHITE); // Body 1
+  display.fillRoundRect(iconX2 - 10, iconY2 + 10, 20, 10, 5, WHITE); // Body 2
+
+  // --- Button label ---
   display.setTextSize(2);
-  display.setCursor(20, 60);
-  display.print("Multiplayer Games:");
-  int y = 110;
-  display.setCursor(20, y);
-  display.print("1) Code Breaker");
+  display.setTextColor(WHITE);
+  int labelX = btnX + 90;
+  int labelY = btnY + 18;
+  display.setCursor(labelX, labelY);
+  display.print("Code");
+  display.setCursor(labelX, labelY + 28);
+  display.print("Breaker");
+
+  // --- Title ---
+  display.setTextSize(2);
+  display.setTextColor(BLACK);
+  int16_t x1, y1;
+  uint16_t w, h;
+  const char *title = "Multiplayer Games";
+  display.getTextBounds(title, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor((SCREEN_WIDTH - w) / 2, 60);
+  display.print(title);
+
+  // --- # logout at bottom right ---
+  const char *logoutText = "# logout";
+  display.setTextSize(1);
+  display.setTextColor(DARKGREY);
+  display.getTextBounds(logoutText, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor(SCREEN_WIDTH - w, SCREEN_HEIGHT - 10);
+  display.print(logoutText);
 }
+
+
 
 void showMenuMessage(const char *msg)
 {
@@ -565,18 +799,6 @@ void showMenuMessage(const char *msg)
   display.setTextSize(2);
   display.setCursor(20, SCREEN_HEIGHT - msgHeight + 10);
   display.print(msg);
-}
-
-void showCodeBreakerTitle()
-{
-  display.fillScreen(WHITE);
-  display.setTextColor(BLACK);
-  display.setTextSize(2);
-  display.setCursor(30, 100);
-  display.print("Code breaker game");
-  delay(2000);
-  display.fillScreen(WHITE);
-  showBottomHints();
 }
 
 void showColorWordTitle()
@@ -647,6 +869,128 @@ void showLastTry(const char *guess)
   display.print("Last try: ");
   display.print(guess);
 }
+void showCodeBreakerDifficultyMenu() {
+  display.fillScreen(WHITE);
+
+  // Bigger buttons
+  int btnW = 200, btnH = 64, radius = 16;
+  int btnX = 20, btnY1 = 60, btnY2 = 150, btnY3 = 240;
+
+  // --- Easy: Green button, big key icon ---
+  display.fillRoundRect(btnX, btnY1, btnW, btnH, radius, GREEN);
+  display.fillCircle(btnX + 32, btnY1 + btnH/2, 12, WHITE); // Key head (bigger)
+  display.drawLine(btnX + 44, btnY1 + btnH/2, btnX + 70, btnY1 + btnH/2, WHITE); // Key shaft (longer)
+  display.drawLine(btnX + 60, btnY1 + btnH/2, btnX + 60, btnY1 + btnH/2 + 12, WHITE); // Key tooth (bigger)
+  display.setTextColor(WHITE);
+  display.setTextSize(2);
+  int easyTextX = btnX + 80;
+  int easyTextY = btnY1 + 18;
+  display.setCursor(easyTextX, easyTextY);
+  display.print("Easy");
+  display.setCursor(easyTextX, easyTextY + 28);
+  display.print("12 tries");
+
+  // --- Medium: Yellow button, big lock icon ---
+  uint16_t yellow = 0xFFE0;
+  display.fillRoundRect(btnX, btnY2, btnW, btnH, radius, yellow);
+  int lx = btnX + 32, ly = btnY2 + btnH/2 + 8;
+  display.drawRect(lx - 14, ly - 14, 28, 28, WHITE); // Lock body (bigger)
+  display.drawArc(lx, ly - 14, 14, 14, 180, 360, WHITE); // Lock shackle (bigger)
+  display.setTextColor(WHITE);
+  display.setTextSize(2);
+  int medTextX = btnX + 80;
+  int medTextY = btnY2 + 18;
+  display.setCursor(medTextX, medTextY);
+  display.print("Medium");
+  display.setCursor(medTextX, medTextY + 28);
+  display.print("8 tries");
+
+  // --- Hard: Red button, big fire icon ---
+  display.fillRoundRect(btnX, btnY3, btnW, btnH, radius, RED);
+  int fx = btnX + 32, fy = btnY3 + btnH/2 + 8;
+  display.fillTriangle(fx, fy - 24, fx - 16, fy + 16, fx + 16, fy + 16, ORANGE); // Big flame
+  display.fillCircle(fx, fy - 4, 8, YELLOW); // Big flame core
+  display.setTextColor(WHITE);
+  display.setTextSize(2);
+  int hardTextX = btnX + 80;
+  int hardTextY = btnY3 + 18;
+  display.setCursor(hardTextX, hardTextY);
+  display.print("Hard");
+  display.setCursor(hardTextX, hardTextY + 28);
+  display.print("5 tries");
+}
+
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void showCodeBreakerTitle()
+{
+  display.fillScreen(WHITE);
+  display.setTextColor(BLACK);
+  display.setTextSize(2);
+  display.setCursor(30, 100);
+  display.print("Code breaker game");
+  delay(2000);
+  display.fillScreen(WHITE);
+  showBottomHints();
+}
+// Show the difficulty selection screen for Visual Memory
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void showVisualMemoryDifficultyMenu() {
+  display.fillScreen(WHITE);
+
+  // Bigger buttons
+  int btnW = 200, btnH = 64, radius = 16;
+  int btnX = 20, btnY1 = 60, btnY2 = 150, btnY3 = 240;
+
+  // --- Easy: Green button, big eye icon ---
+  display.fillRoundRect(btnX, btnY1, btnW, btnH, radius, GREEN);
+  int ex = btnX + 32, ey = btnY1 + btnH/2;
+  display.drawEllipse(ex, ey, 14, 7, WHITE); // Bigger eye outline
+  display.fillCircle(ex, ey, 4, BLACK);      // Bigger pupil
+  display.setTextColor(WHITE);
+  display.setTextSize(2);
+  int easyTextX = btnX + 80;
+  int easyTextY = btnY1 + 18;
+  display.setCursor(easyTextX, easyTextY);
+  display.print("Easy");
+  display.setCursor(easyTextX, easyTextY + 28);
+  display.print("5 seq");
+
+  // --- Medium: Yellow button, big brain icon ---
+  uint16_t yellow = 0xFFE0;
+  display.fillRoundRect(btnX, btnY2, btnW, btnH, radius, yellow);
+  int bx = btnX + 32, by = btnY2 + btnH/2;
+  display.fillCircle(bx - 7, by, 8, WHITE);
+  display.fillCircle(bx + 7, by, 8, WHITE);
+  display.setTextColor(WHITE);
+  display.setTextSize(2);
+  int medTextX = btnX + 80;
+  int medTextY = btnY2 + 18;
+  display.setCursor(medTextX, medTextY);
+  display.print("Medium");
+  display.setCursor(medTextX, medTextY + 28);
+  display.print("8 seq");
+
+  // --- Hard: Red button, big lightning icon ---
+  display.fillRoundRect(btnX, btnY3, btnW, btnH, radius, RED);
+  int lx = btnX + 32, ly = btnY3 + btnH/2 - 8;
+  display.drawLine(lx, ly, lx + 12, ly + 24, ORANGE);           // Top
+  display.drawLine(lx + 12, ly + 24, lx - 6, ly + 24, ORANGE);  // Middle
+  display.drawLine(lx - 6, ly + 24, lx + 4, ly + 44, ORANGE);   // Bottom
+  display.setTextColor(WHITE);
+  display.setTextSize(2);
+  int hardTextX = btnX + 80;
+  int hardTextY = btnY3 + 18;
+  display.setCursor(hardTextX, hardTextY);
+  display.print("Hard");
+  display.setCursor(hardTextX, hardTextY + 28);
+  display.print("10 seq");
+}
+
 
 void showInputProgress(const char *inputBuffer, byte inputIndex)
 {
@@ -1118,8 +1462,7 @@ void loop()
     {
       showModeSelect();
       currentState = MODE_SELECT;
-      // Optionally reset other variables here if needed
-      return; // or break; if not in a function
+      return;
     }
 
     if (key && key >= '1' && key <= '0' + playerCount)
@@ -1201,6 +1544,12 @@ void loop()
 
       currentState = CODE_BREAKER_MULTI_SECRET1;
       break;
+    }
+if (key == '#')
+    {
+      showModeSelect();
+      currentState = MODE_SELECT;
+      return; // or break; if not in a function
     }
 
     // If any other key is pressed, show "Not implemented"
@@ -1436,7 +1785,7 @@ void loop()
     {
       showModeSelect();
       currentState = MODE_SELECT;
-      return; // or break; if not in a function
+      return;
     }
 
     if (key && key >= '1' && key <= '4' && key - '0' <= playerCount)
@@ -1450,6 +1799,7 @@ void loop()
   }
 
   case MENU:
+
   {
     if (key)
     {
@@ -1467,48 +1817,34 @@ void loop()
       //  Code Breaker
       if (key == '1')
       {
-        showCodeBreakerTitle();
         generateNewRandomNumber();
         inputIndex = 0;
         codeBreakerWrongTries = 0; // Reset here the number of tries
         showInputProgress(inputBuffer, inputIndex);
-        currentState = CODE_BREAKER;
+        currentState = CODE_BREAKER_DIFFICULTY_SELECT;
+        showCodeBreakerDifficultyMenu();
+        if (key == '*')
+        {
+          display.fillRect(0, 220, SCREEN_WIDTH, 30, WHITE);
+          showMenu();
+          currentState = MENU;
+          codeBreakerWrongTries = 0;
+          visualMemoryWrongTries = 0;
+          break;
+        }
+        if (key == '#')
+        {
+          showModeSelect();
+          currentState = MODE_SELECT;
+          codeBreakerWrongTries = 0;
+          visualMemoryWrongTries = 0;
+          break;
+        }
       }
       else if (key == '2')
-      { // Visual Memory
-        display.fillScreen(WHITE);
-        display.setTextColor(BLACK);
-        display.setTextSize(2);
-        display.setCursor(20, 100);
-        display.print("Visual memory game");
-        showBottomHints();
-        delay(1000);
-
-        visualMemoryWrongTries = 0; // Reset here the number of tries
-
-        generateRandomColorSequence(colorSequence, colorSequenceLength);
-        for (uint8_t i = 0; i < colorSequenceLength; i++)
-        {
-          showColorOnDisplay(colorSequence[i]);
-          showColorOnRings(colorSequence[i]); // Show color on rings
-          delay(2000);
-          turnOffAllRings(); // Turn off all rings after showing
-          if (i < colorSequenceLength - 1)
-          {
-            display.fillScreen(WHITE);
-            delay(1000);
-          }
-          turnOffAllRings(); // Turn off all rings after showing
-        }
-        display.fillScreen(WHITE);
-        display.setTextColor(BLACK);
-        display.setTextSize(2);
-        display.setCursor(20, 100);
-        display.print("Repeat the sequence!");
-        showBottomHints();
-        currentStep = 0;
-        lastButtonState[0] = lastButtonState[1] = lastButtonState[2] = HIGH;
-        currentState = VISUAL_MEMORY_INPUT;
+      {
+        currentState = VISUAL_MEMORY_DIFFICULTY_SELECT;
+        showVisualMemoryDifficultyMenu();
       }
       // --- Color-Word Challenge menu handler ---
       else if (key == '3')
@@ -1526,6 +1862,72 @@ void loop()
       {
         showMenuMessage("Please choose 1, 2, 3 or 4");
       }
+    }
+    break;
+  }
+
+  case VISUAL_MEMORY_DIFFICULTY_SELECT:
+  {
+    if (key)
+    {
+      if (key == '*')
+      {
+        display.fillRect(0, 220, SCREEN_WIDTH, 30, WHITE);
+        showMenu();
+        currentState = MENU;
+        codeBreakerWrongTries = 0;
+        visualMemoryWrongTries = 0;
+        break;
+      }
+      if (key == '#')
+      {
+        showModeSelect();
+        currentState = MODE_SELECT;
+        codeBreakerWrongTries = 0;
+        visualMemoryWrongTries = 0;
+        break;
+      }
+      switch (key)
+      {
+      case '1': // Easy
+        colorSequenceLength = 5;
+        break;
+      case '2': // Medium
+        colorSequenceLength = 8;
+        break;
+      case '3': // Hard
+        colorSequenceLength = 10;
+        break;
+      default:
+        // Ignore other keys
+        return;
+      }
+      visualMemoryWrongTries = 0; // Reset tries
+
+      // Now start the Visual Memory game as before:
+      generateRandomColorSequence(colorSequence, colorSequenceLength);
+      for (uint8_t i = 0; i < colorSequenceLength; i++)
+      {
+        showColorOnDisplay(colorSequence[i]);
+        showColorOnRings(colorSequence[i]);
+        delay(2000);
+        turnOffAllRings();
+        if (i < colorSequenceLength - 1)
+        {
+          display.fillScreen(WHITE);
+          delay(1000);
+        }
+        turnOffAllRings();
+      }
+      display.fillScreen(WHITE);
+      display.setTextColor(BLACK);
+      display.setTextSize(2);
+      display.setCursor(20, 100);
+      display.print("Repeat the sequence!");
+      showBottomHints();
+      currentStep = 0;
+      lastButtonState[0] = lastButtonState[1] = lastButtonState[2] = HIGH;
+      currentState = VISUAL_MEMORY_INPUT;
     }
     break;
   }
@@ -1565,7 +1967,7 @@ void loop()
           currentStep++;
           if (currentStep == colorSequenceLength)
           {
-            int stars = maxWrongTries - visualMemoryWrongTries;
+            int stars = 10 - visualMemoryWrongTries;
             showCenteredStarsAndScore(stars); // Show only stars and score, centered
             delay(2000);                      // Show for 2 seconds
             showMenu();                       // Return to games menu
@@ -1578,7 +1980,7 @@ void loop()
         {
           visualMemoryWrongTries++; // Increment on wrong try
           // Check if the number of wrong tries exceeds the maximum allowed
-          if (visualMemoryWrongTries >= maxWrongTries)
+          if (visualMemoryWrongTries >= maxWrongTries_VM)
           {
             display.fillScreen(WHITE);
             display.setTextColor(RED);
@@ -1609,7 +2011,7 @@ void loop()
           display.setCursor(20, 100);
           display.print("Repeat the sequence!");
           showBottomHints();
-          showTriesRemaining(maxWrongTries - visualMemoryWrongTries);
+          showTriesRemaining(maxWrongTries_VM - visualMemoryWrongTries);
           currentStep = 0;
         }
       }
@@ -1921,6 +2323,61 @@ void loop()
       showMenu();
       currentState = MENU;
       ledReactionWaiting = false;
+    }
+    break;
+  }
+
+  case CODE_BREAKER_DIFFICULTY_SELECT:
+  {
+    if (key)
+    {
+      if (key == '*')
+      {
+        display.fillRect(0, 220, SCREEN_WIDTH, 30, WHITE);
+        showMenu();
+        currentState = MENU;
+        codeBreakerWrongTries = 0;
+        visualMemoryWrongTries = 0;
+        break;
+      }
+      if (key == '#')
+      {
+        showModeSelect();
+        currentState = MODE_SELECT;
+        codeBreakerWrongTries = 0;
+        visualMemoryWrongTries = 0;
+        break;
+      }
+      switch (key)
+      {
+      case '1': // Easy
+        codeBreakerWrongTries = 0;
+        // Set max tries for easy
+        maxWrongTries = 12;
+        currentState = CODE_BREAKER;
+        showCodeBreakerTitle(); // Show the title screen
+        generateNewRandomNumber();
+        break;
+      case '2': // Medium
+        codeBreakerWrongTries = 0;
+        // Set max tries for medium
+        maxWrongTries = 8;
+        currentState = CODE_BREAKER;
+        showCodeBreakerTitle(); // Show the title screen
+        generateNewRandomNumber();
+        break;
+      case '3': // Hard
+        codeBreakerWrongTries = 0;
+        // Set max tries for hard
+        maxWrongTries = 5;
+        currentState = CODE_BREAKER;
+        showCodeBreakerTitle(); // Show the title screen
+        generateNewRandomNumber();
+        break;
+      default:
+        // Ignore other keys
+        break;
+      }
     }
     break;
   }
