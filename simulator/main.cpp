@@ -7,6 +7,7 @@
 #include "esp_wpa2.h"  // Only needed for WPA2-Enterprise
 #include <WiFiClientSecure.h>
 #include <vector>
+#include <time.h>
 
 unsigned long colorWordStepStartTime = 0;
 enum CodeBreakerDifficulty {
@@ -206,6 +207,7 @@ const char *collection = "users";
 
 // Players info
 std::vector<String> playerNames;
+std::vector<String> playerDocIds;
 int playerCount = 0;  // Will be updated after fetching
 int maxToShow = 0;
 int playerDisplayOffset = 0;  // For paging through playerNames
@@ -215,6 +217,29 @@ int codeBreakerWrongTries = 0;
 int visualMemoryWrongTries = 0;
 int maxWrongTries = 5;
 int maxWrongTries_VM = 3;  // For Visual Memory game
+
+// Call this once after WiFi connects
+void setupTime() {
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov");  // UTC
+  struct tm timeinfo;
+  while (!getLocalTime(&timeinfo)) {
+    Serial.println("Waiting for NTP time sync...");
+    delay(1000);
+  }
+}
+
+
+// Get ISO 8601 string with timezone offset
+String getCurrentISOTimeUTC() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    return "";
+  }
+  char buf[32];
+  strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);  // Always UTC
+  return String(buf);
+}
+
 
 void showLedReactionScore(int score) {
   display.fillScreen(WHITE);
@@ -771,6 +796,7 @@ void showColorOnDisplay(uint8_t colorIndex) {
 // Fetch and parse player names from Firestore
 void fetchPlayersFromFirestore() {
   playerNames.clear();
+  playerDocIds.clear();
   playerCount = 0;
 
   String url = "https://firestore.googleapis.com/v1/projects/" + String(projectId) + "/databases/(default)/documents/" + collection + "?key=" + apiKey;
@@ -799,6 +825,12 @@ void fetchPlayersFromFirestore() {
         String name = d["fields"]["username"]["stringValue"].as<String>();
         playerNames.push_back(name);
         playerCount++;
+
+        // Extract document ID from "name" field
+        String docPath = d["name"].as<String>();  // e.g. ".../users/ABC123"
+        int lastSlash = docPath.lastIndexOf('/');
+        String docId = docPath.substring(lastSlash + 1);
+        playerDocIds.push_back(docId);
       }
     }
   } else {
@@ -813,6 +845,180 @@ void fetchPlayersFromFirestore() {
     Serial.println(playerNames[i]);
   }
 }
+
+void uploadCodeBreakerSession(const String &userDocId, int stars, int score) {
+  String url = "https://firestore.googleapis.com/v1/projects/";
+  url += projectId;
+  url += "/databases/(default)/documents/users/";
+  url += userDocId;  // Use the Firestore document ID, not the display name!
+  url += "/games/code_breaker_game/sessions?key=";
+  url += apiKey;
+
+  DynamicJsonDocument doc(256);
+  doc["fields"]["coins"]["integerValue"] = stars;
+  doc["fields"]["score"]["integerValue"] = score * 10;
+
+  String payload;
+  serializeJson(doc, payload);
+
+  HTTPClient http;
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  int httpCode = http.POST(payload);
+  if (httpCode == 200) {
+    Serial.println("Session uploaded successfully!");
+  } else {
+    Serial.print("Failed to upload session. HTTP code: ");
+    Serial.println(httpCode);
+    Serial.println(http.getString());
+  }
+  http.end();
+}
+
+void uploadVisualMemorySession(const String &userDocId, int coins, int score) {
+  String url = "https://firestore.googleapis.com/v1/projects/";
+  url += projectId;
+  url += "/databases/(default)/documents/users/";
+  url += userDocId;
+  url += "/games/visual_memory_challenge/sessions?key=";  // <-- updated path
+  url += apiKey;
+
+  DynamicJsonDocument doc(256);
+  doc["fields"]["coins"]["integerValue"] = coins;
+  doc["fields"]["score"]["integerValue"] = score * 10;
+
+  String payload;
+  serializeJson(doc, payload);
+
+  HTTPClient http;
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  int httpCode = http.POST(payload);
+  if (httpCode == 200) {
+    Serial.println("Visual Memory Challenge session uploaded successfully!");
+  } else {
+    Serial.print("Failed to upload Visual Memory Challenge session. HTTP code: ");
+    Serial.println(httpCode);
+    Serial.println(http.getString());
+  }
+  http.end();
+}
+int fetchHighScore(const String &userDocId, const String &gameName) {
+  String url = "https://firestore.googleapis.com/v1/projects/";
+  url += projectId;
+  url += "/databases/(default)/documents/users/";
+  url += userDocId;
+  url += "/games/";
+  url += gameName;
+  url += "?key=";
+  url += apiKey;
+
+  HTTPClient http;
+  http.begin(url);
+  int httpCode = http.GET();
+  int highScore = 0;
+  if (httpCode == 200) {
+    String payload = http.getString();
+    DynamicJsonDocument doc(512);
+    deserializeJson(doc, payload);
+    if (doc["fields"]["high_score"]["integerValue"]) {
+      highScore = doc["fields"]["high_score"]["integerValue"].as<int>();
+    }
+  }
+  http.end();
+  return highScore;
+}
+void updateHighScore(const String &userDocId, const String &gameName, int newHighScore) {
+  String url = "https://firestore.googleapis.com/v1/projects/";
+  url += projectId;
+  url += "/databases/(default)/documents/users/";
+  url += userDocId;
+  url += "/games/";
+  url += gameName;
+  url += "?key=";
+  url += apiKey;
+
+  DynamicJsonDocument doc(128);
+  doc["fields"]["high_score"]["integerValue"] = newHighScore * 20;
+
+  String payload;
+  serializeJson(doc, payload);
+
+  HTTPClient http;
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  int httpCode = http.PATCH(payload);  // PATCH to update only the field
+  if (httpCode == 200) {
+    Serial.println("High score updated!");
+  } else {
+    Serial.print("Failed to update high score. HTTP code: ");
+    Serial.println(httpCode);
+    Serial.println(http.getString());
+  }
+  http.end();
+}
+
+void uploadLedReactionSession(const String &userDocId, int coins, int score) {
+  String url = "https://firestore.googleapis.com/v1/projects/";
+  url += projectId;
+  url += "/databases/(default)/documents/users/";
+  url += userDocId;
+  url += "/games/LED_reaction_game/sessions?key=";
+  url += apiKey;
+
+  DynamicJsonDocument doc(256);
+  doc["fields"]["coins"]["integerValue"] = coins;
+  doc["fields"]["score"]["integerValue"] = score;
+
+  String payload;
+  serializeJson(doc, payload);
+
+  HTTPClient http;
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  int httpCode = http.POST(payload);
+  if (httpCode == 200) {
+    Serial.println("LED Reaction Game session uploaded successfully!");
+  } else {
+    Serial.print("Failed to upload LED Reaction Game session. HTTP code: ");
+    Serial.println(httpCode);
+    Serial.println(http.getString());
+  }
+  http.end();
+}
+
+
+
+
+void uploadColorWordSession(const String &userDocId, int coins, int score) {
+  String url = "https://firestore.googleapis.com/v1/projects/";
+  url += projectId;
+  url += "/databases/(default)/documents/users/";
+  url += userDocId;
+  url += "/games/color_word_game/sessions?key=";
+  url += apiKey;
+
+  DynamicJsonDocument doc(256);
+  doc["fields"]["coins"]["integerValue"] = coins;
+  doc["fields"]["score"]["integerValue"] = score;
+
+  String payload;
+  serializeJson(doc, payload);
+
+  HTTPClient http;
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  int httpCode = http.POST(payload);
+  if (httpCode == 200) {
+    Serial.println("Color Word Game session uploaded successfully!");
+  } else {
+    Serial.print("Failed to upload Color Word Game session. HTTP code: ");
+    Serial.println(httpCode);
+    Serial.println(http.getString());
+  }
+  http.end();
+}
+
 
 // Show player selection menu with fetched names
 void showPlayerMenu() {
@@ -1151,7 +1357,7 @@ void loop() {
           int actualIndex = playerDisplayOffset + selection;
           if (actualIndex < playerNames.size()) {
             multiplayerPlayer1 = actualIndex;                  // 0-based index for player
-            playerDisplayOffset = 0; // Reset for next selection
+            playerDisplayOffset = 0;                           // Reset for next selection
             showMultiplayerPlayerSelect2(multiplayerPlayer1);  // Pass 0-based index to exclude
             currentState = PLAYER2_SELECT;
             delay(150);
@@ -1179,7 +1385,7 @@ void loop() {
         }
 
         if (key && key >= '1' && key <= '0' + maxToShow) {
-          int option = key - '1';                // 0-based option (0,1,2,3)
+          int option = key - '1';            // 0-based option (0,1,2,3)
           int exclude = multiplayerPlayer1;  // 0-based index to skip
           int chosenIdx = -1;
           int count = 0;
@@ -1623,9 +1829,15 @@ void loop() {
               currentStep++;
               if (currentStep == colorSequenceLength) {
                 int stars = 10 - visualMemoryWrongTries;
-                showCenteredStarsAndScore(stars);  // Show only stars and score, centered
-                delay(2000);                       // Show for 2 seconds
-                showMenu();                        // Return to games menu
+                showCenteredStarsAndScore(stars);
+                uploadVisualMemorySession(playerDocIds[currentPlayer], stars, stars * 2);
+                String gameName = "visual_memory_challenge";
+                int currentHighScore = fetchHighScore(playerDocIds[currentPlayer], gameName);
+                if (stars * 20 > currentHighScore) {
+                  updateHighScore(playerDocIds[currentPlayer], gameName, stars);
+                }             // Show only stars and score, centered
+                delay(2000);  // Show for 2 seconds
+                showMenu();   // Return to games menu
                 currentState = MENU;
                 visualMemoryWrongTries = 0;  // Reset tries
                 break;
@@ -1639,6 +1851,8 @@ void loop() {
                 display.setTextSize(2);
                 display.setCursor(20, 120);
                 display.print("Out of tries!");
+                uploadVisualMemorySession(playerDocIds[currentPlayer], 0, 0);
+
                 delay(2000);
                 display.fillRect(0, 220, SCREEN_WIDTH, 30, WHITE);
                 showMenu();
@@ -1811,6 +2025,13 @@ void loop() {
           if (colorWordCurrentStep == COLOR_WORD_CHALLENGE_LENGTH) {
             int stars = colorWordMaxTries - colorWordWrongTries;
             showCenteredStarsAndScore(stars);
+            uploadColorWordSession(playerDocIds[currentPlayer], stars, stars * 2);
+            String gameName = "color_word_game";
+            int currentHighScore = fetchHighScore(playerDocIds[currentPlayer], gameName);
+            if (stars * 20 > currentHighScore) {
+              updateHighScore(playerDocIds[currentPlayer], gameName, stars);
+            }
+
             delay(2000);
             showMenu();
             currentState = MENU;
@@ -1842,6 +2063,12 @@ void loop() {
             if (colorWordCurrentStep == COLOR_WORD_CHALLENGE_LENGTH) {
               int stars = colorWordMaxTries - colorWordWrongTries;
               showCenteredStarsAndScore(stars);
+              uploadColorWordSession(playerDocIds[currentPlayer], stars, stars * 2);
+              String gameName = "color_word_game";
+              int currentHighScore = fetchHighScore(playerDocIds[currentPlayer], gameName);
+              if (stars * 20 > currentHighScore) {
+                updateHighScore(playerDocIds[currentPlayer], gameName, stars);
+              }
               delay(2000);
               showMenu();
               currentState = MENU;
@@ -1936,6 +2163,12 @@ void loop() {
           ledReactionActive = false;
           turnOffAllRings();
           showLedReactionScore(ledReactionCorrect);  // Show score
+          uploadLedReactionSession(playerDocIds[currentPlayer], ledReactionCorrect, ledReactionCorrect * 2);
+          String gameName = "LED_reaction_game";
+          int currentHighScore = fetchHighScore(playerDocIds[currentPlayer], gameName);
+          if (ledReactionCorrect * 2 > currentHighScore) {
+            updateHighScore(playerDocIds[currentPlayer], gameName, ledReactionCorrect * 2);
+          }
           showMenu();
           currentState = MENU;
           ledReactionWaiting = false;
@@ -2025,8 +2258,14 @@ void loop() {
             if (strcmp(inputBuffer, randomNumberStr) == 0) {
               int stars = maxWrongTries - codeBreakerWrongTries;
               showCenteredStarsAndScore(stars);  // Show only stars and score, centered
-              delay(2000);                       // Show for 2 seconds
-              showMenu();                        // Return to games menu
+              uploadCodeBreakerSession(playerDocIds[currentPlayer], stars, stars * 2);
+              String gameName = "code_breaker_game";
+              int currentHighScore = fetchHighScore(playerDocIds[currentPlayer], gameName);
+              if (stars * 20 >   currentHighScore) {
+                updateHighScore(playerDocIds[currentPlayer], gameName, stars);
+              }
+              delay(2000);  // Show for 2 seconds
+              showMenu();   // Return to games menu
               currentState = MENU;
               codeBreakerWrongTries = 0;  // Reset tries
               inputIndex = 0;
@@ -2049,6 +2288,7 @@ void loop() {
                 display.setTextSize(2);
                 display.setCursor(20, 120);
                 display.print("Out of tries!");
+                uploadCodeBreakerSession(playerDocIds[currentPlayer], 0, 0);
                 delay(2000);
 
                 // Clear the input progress line (where "_ _ _" is shown)
