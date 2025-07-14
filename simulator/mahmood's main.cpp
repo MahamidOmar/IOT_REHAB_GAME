@@ -554,6 +554,68 @@ void showModeSelect() {
   display.print(hint);
 }
 
+
+void showMultiplayerPlayerSelect1(int selected = -1) {
+  display.fillScreen(WHITE);
+
+  // --- Title ---
+  display.setTextColor(BLACK);
+  display.setTextSize(2);
+  const char *title = "Choose Player 1:";
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(title, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor((SCREEN_WIDTH - w) / 2, 32);
+  display.print(title);
+
+  // --- Button dimensions ---
+  int btnWidth = 180;
+  int btnHeight = 48;
+  int btnX = (SCREEN_WIDTH - btnWidth) / 2;
+  int btnYStart = 80;
+  int btnSpacing = 16;
+  int radius = 14;
+
+  // --- Button colors ---
+  uint16_t btnColors[] = {0x3A99, 0xFFE0, 0xC618, 0xF800, 0x07E0}; // blue, yellow, grey, red, green
+
+  int shown = 0;
+  for (int i = 0; i < maxToShow; i++) {
+    int btnY = btnYStart + i * (btnHeight + btnSpacing);
+    uint16_t color = btnColors[i % 5];
+
+    // Highlight selected player (if any)
+    if (i == selected) {
+      display.drawRoundRect(btnX-3, btnY-3, btnWidth+6, btnHeight+6, radius+3, BLACK);
+    }
+
+    display.fillRoundRect(btnX, btnY, btnWidth, btnHeight, radius, color);
+
+    // Center player name in button
+    display.setTextColor(BLACK);
+    display.setTextSize(2);
+    String name = playerNames[playerDisplayOffset + i];
+    int16_t nx1, ny1;
+    uint16_t nw, nh;
+    display.getTextBounds(name.c_str(), 0, 0, &nx1, &ny1, &nw, &nh);
+    int nameX = btnX + (btnWidth - nw) / 2;
+    int nameY = btnY + (btnHeight - nh) / 2;
+    display.setCursor(nameX, nameY);
+    display.print(name);
+    ++shown;
+  }
+
+  // --- Logout at bottom right ---
+  const char *logoutText = "# logout";
+  int16_t lx1, ly1;
+  uint16_t lw, lh;
+  display.setTextSize(1);
+  display.setTextColor(DARKGREY);
+  display.getTextBounds(logoutText, 0, 0, &lx1, &ly1, &lw, &lh);
+  display.setCursor(SCREEN_WIDTH - lw, SCREEN_HEIGHT - 10);
+  display.print(logoutText);
+}
+/*
 // Show the multiplayer player selection screen, first for player 1 then for player 2
 void showMultiplayerPlayerSelect1() {
   display.fillScreen(WHITE);
@@ -579,8 +641,8 @@ void showMultiplayerPlayerSelect1() {
   display.getTextBounds(logoutText, 0, 0, &x1, &y1, &w, &h);
   display.setCursor(SCREEN_WIDTH - w, SCREEN_HEIGHT - 10);
   display.print(logoutText);
-}
-
+}*/
+/*
 void showMultiplayerPlayerSelect2(byte excludeIndex) {
   display.fillScreen(WHITE);
   display.setTextColor(BLACK);
@@ -609,6 +671,75 @@ void showMultiplayerPlayerSelect2(byte excludeIndex) {
   display.setCursor(SCREEN_WIDTH - w, SCREEN_HEIGHT - 10);
   display.print(logoutText);
 }
+*/
+void showMultiplayerPlayerSelect2(byte excludeIndex, int selected = -1) {
+  display.fillScreen(WHITE);
+
+  // --- Title ---
+  display.setTextColor(BLACK);
+  display.setTextSize(2);
+  const char *title = "Choose Player 2:";
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(title, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor((SCREEN_WIDTH - w) / 2, 32);
+  display.print(title);
+
+  // --- Button dimensions ---
+  int btnWidth = 180;
+  int btnHeight = 48;
+  int btnX = (SCREEN_WIDTH - btnWidth) / 2;
+  int btnYStart = 80;
+  int btnSpacing = 16;
+  int radius = 14;
+
+  // --- Button colors ---
+  uint16_t btnColors[] = {0x3A99, 0xFFE0, 0xC618, 0xF800, 0x07E0}; // blue, yellow, grey, red, green
+
+  int shown = 0;
+  int optionNum = 0;
+  for (int i = playerDisplayOffset; i < playerNames.size() && shown < maxToShow; i++) {
+    if (i == excludeIndex)
+      continue;  // skip the chosen player
+
+    int btnY = btnYStart + shown * (btnHeight + btnSpacing);
+    uint16_t color = btnColors[shown % 5];
+
+    // Highlight selected player (if any)
+    if (shown == selected) {
+      display.drawRoundRect(btnX-3, btnY-3, btnWidth+6, btnHeight+6, radius+3, BLACK);
+    }
+
+    display.fillRoundRect(btnX, btnY, btnWidth, btnHeight, radius, color);
+
+    // Center player name in button
+    display.setTextColor(BLACK);
+    display.setTextSize(2);
+    String name = playerNames[i];
+    int16_t nx1, ny1;
+    uint16_t nw, nh;
+    display.getTextBounds(name.c_str(), 0, 0, &nx1, &ny1, &nw, &nh);
+    int nameX = btnX + (btnWidth - nw) / 2;
+    int nameY = btnY + (btnHeight - nh) / 2;
+    display.setCursor(nameX, nameY);
+    display.print(name);
+
+    shown++;
+    optionNum++;
+  }
+
+  // --- Logout at bottom right ---
+  const char *logoutText = "# logout";
+  int16_t lx1, ly1;
+  uint16_t lw, lh;
+  display.setTextSize(1);
+  display.setTextColor(DARKGREY);
+  display.getTextBounds(logoutText, 0, 0, &lx1, &ly1, &lw, &lh);
+  display.setCursor(SCREEN_WIDTH - lw, SCREEN_HEIGHT - 10);
+  display.print(logoutText);
+}
+
+
 
 void showNextLedReactionColor() {
   ledReactionCurrentColor = random(0, 3);
@@ -1285,8 +1416,73 @@ void uploadColorWordSession(const String &userDocId, int coins, int score) {
 }
 
 
+
+void showPlayerMenu(int selected = -1) {
+  inputIndex = 0;
+  inputBuffer[0] = inputBuffer[1] = inputBuffer[2] = inputBuffer[3] = '\0';
+
+  display.fillScreen(WHITE);
+
+  // --- Title ---
+  display.setTextColor(BLACK);
+  display.setTextSize(2);
+  const char *title = "Select player:";
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(title, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor((SCREEN_WIDTH - w) / 2, 32);
+  display.print(title);
+
+  // --- Button dimensions ---
+  int btnWidth = 180;
+  int btnHeight = 48;
+  int btnX = (SCREEN_WIDTH - btnWidth) / 2;
+  int btnYStart = 80;
+  int btnSpacing = 16;
+  int radius = 14;
+
+  // --- Button colors ---
+  uint16_t btnColors[] = {0x3A99, 0xFFE0, 0xC618, 0xF800, 0x07E0}; // blue, yellow, grey, red, green
+
+  int shown = 0;
+  for (int i = 0; i < maxToShow; i++) {
+    int btnY = btnYStart + i * (btnHeight + btnSpacing);
+    uint16_t color = btnColors[i % 5];
+
+    // Highlight selected player (if any)
+    if (i == selected) {
+      display.drawRoundRect(btnX-3, btnY-3, btnWidth+6, btnHeight+6, radius+3, BLACK);
+    }
+
+    display.fillRoundRect(btnX, btnY, btnWidth, btnHeight, radius, color);
+
+    // Center player name in button
+    display.setTextColor(BLACK);
+    display.setTextSize(2);
+    String name = playerNames[playerDisplayOffset + i];
+    int16_t nx1, ny1;
+    uint16_t nw, nh;
+    display.getTextBounds(name.c_str(), 0, 0, &nx1, &ny1, &nw, &nh);
+    int nameX = btnX + (btnWidth - nw) / 2;
+    int nameY = btnY + (btnHeight - nh) / 2;
+    display.setCursor(nameX, nameY);
+    display.print(name);
+    ++shown;
+  }
+
+  // --- Logout at bottom right ---
+  const char *logoutText = "# logout";
+  int16_t lx1, ly1;
+  uint16_t lw, lh;
+  display.setTextSize(1);
+  display.setTextColor(DARKGREY);
+  display.getTextBounds(logoutText, 0, 0, &lx1, &ly1, &lw, &lh);
+  display.setCursor(SCREEN_WIDTH - lw, SCREEN_HEIGHT - 10);
+  display.print(logoutText);
+}
+
 // Show player selection menu with fetched names
-void showPlayerMenu() {
+/*void showPlayerMenu() {
   inputIndex = 0;
   inputBuffer[0] = inputBuffer[1] = inputBuffer[2] = inputBuffer[3] = '\0';
 
@@ -1313,7 +1509,7 @@ void showPlayerMenu() {
   display.getTextBounds(logoutText, 0, 0, &x1, &y1, &w, &h);
   display.setCursor(SCREEN_WIDTH - w, SCREEN_HEIGHT - 10);
   display.print(logoutText);
-}
+}*/
 
 // Show loading screen with a circle and "loading" text
 // This function can be called while fetching data or performing long operations
